@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# SQLite
+*.db
+*.db-journal
+
+# Node (Phase 2)
+node_modules/
+frontend/dist/
+
+# Editors
+.vscode/
+.idea/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
