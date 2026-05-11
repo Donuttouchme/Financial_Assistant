@@ -57,6 +57,12 @@ def create_transaction(
     db.add(tx)
     db.commit()
     db.refresh(tx)
+
+    if is_recurring:
+        # Imported lazily to avoid a circular import.
+        from app.services import recurring_service
+        recurring_service.create_schedule_for_transaction(db, transaction=tx)
+
     return tx
 
 
