@@ -1,1 +1,3 @@
-# Re-exported as models land in later tasks.
+from app.models.category import Category
+
+__all__ = ["Category"]
