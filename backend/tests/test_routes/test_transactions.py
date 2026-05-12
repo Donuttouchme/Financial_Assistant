@@ -1,0 +1,104 @@
+def test_create_transaction_returns_201(client):
+    cat_id = client.post("/api/categories", json={"name": "Groceries"}).json()["id"]
+    response = client.post(
+        "/api/transactions",
+        json={
+            "amount": "12.34",
+            "date": "2026-05-10",
+            "category_id": cat_id,
+            "description": "Milk",
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["amount"] == "12.34"
+    assert body["date"] == "2026-05-10"
+    assert body["description"] == "Milk"
+    assert body["is_recurring"] is False
+
+
+def test_create_recurring_transaction_seeds_schedule(client, db_session):
+    from app.services import recurring_service
+    cat_id = client.post("/api/categories", json={"name": "Rent"}).json()["id"]
+    client.post(
+        "/api/transactions",
+        json={
+            "amount": "500.00",
+            "date": "2026-05-01",
+            "category_id": cat_id,
+            "description": "Rent",
+            "is_recurring": True,
+        },
+    )
+    schedules = recurring_service.list_schedules(db_session, user_id=1)
+    assert len(schedules) == 1
+    assert schedules[0].next_occurrence_date.isoformat() == "2026-06-01"
+
+
+def test_create_transaction_rejects_unknown_category(client):
+    response = client.post(
+        "/api/transactions",
+        json={"amount": "5", "date": "2026-05-10", "category_id": 999, "description": ""},
+    )
+    assert response.status_code == 404
+
+
+def test_create_transaction_rejects_zero_amount(client):
+    cat_id = client.post("/api/categories", json={"name": "Misc"}).json()["id"]
+    response = client.post(
+        "/api/transactions",
+        json={"amount": "0", "date": "2026-05-10", "category_id": cat_id, "description": ""},
+    )
+    assert response.status_code == 422
+
+
+def test_list_transactions_filters_by_month_and_category(client):
+    g = client.post("/api/categories", json={"name": "Groceries"}).json()["id"]
+    r = client.post("/api/categories", json={"name": "Rent"}).json()["id"]
+    client.post("/api/transactions", json={"amount": "1", "date": "2026-04-30", "category_id": g, "description": "old"})
+    client.post("/api/transactions", json={"amount": "5", "date": "2026-05-03", "category_id": g, "description": "food"})
+    client.post("/api/transactions", json={"amount": "500", "date": "2026-05-01", "category_id": r, "description": "rent"})
+
+    response = client.get("/api/transactions", params={"month": "2026-05"})
+    assert response.status_code == 200
+    descs = [t["description"] for t in response.json()]
+    assert sorted(descs) == ["food", "rent"]
+
+    only_rent = client.get("/api/transactions", params={"month": "2026-05", "category_id": r}).json()
+    assert [t["description"] for t in only_rent] == ["rent"]
+
+
+def test_update_transaction_returns_200_with_new_values(client):
+    cat_id = client.post("/api/categories", json={"name": "Misc"}).json()["id"]
+    tx_id = client.post(
+        "/api/transactions",
+        json={"amount": "5", "date": "2026-05-01", "category_id": cat_id, "description": "old"},
+    ).json()["id"]
+
+    response = client.put(
+        f"/api/transactions/{tx_id}",
+        json={"amount": "9.99", "description": "new"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["amount"] == "9.99"
+    assert body["description"] == "new"
+    assert body["date"] == "2026-05-01"
+
+
+def test_update_unknown_transaction_returns_404(client):
+    response = client.put("/api/transactions/9999", json={"amount": "1"})
+    assert response.status_code == 404
+
+
+def test_delete_transaction_returns_204(client):
+    cat_id = client.post("/api/categories", json={"name": "Misc"}).json()["id"]
+    tx_id = client.post(
+        "/api/transactions",
+        json={"amount": "5", "date": "2026-05-01", "category_id": cat_id, "description": ""},
+    ).json()["id"]
+
+    response = client.delete(f"/api/transactions/{tx_id}")
+    assert response.status_code == 204
+
+    assert client.get("/api/transactions").json() == []
