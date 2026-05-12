@@ -25,3 +25,6 @@ frontend/dist/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Runtime launcher log
+scripts/start-error.log
