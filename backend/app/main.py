@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 import app.models  # noqa: F401 — register models with Base.metadata
 from app.database import Base, SessionLocal, engine
-from app.routers import health
+from app.routers import categories, health
 from app.services import recurring_service
 
 
@@ -22,3 +22,4 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Financial Assistant API", version="0.1.0", lifespan=lifespan)
 app.include_router(health.router)
+app.include_router(categories.router)

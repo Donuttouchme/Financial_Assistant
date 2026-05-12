@@ -35,5 +35,15 @@ def delete_category(db: Session, *, user_id: int, category_id: int) -> None:
     cat = get_category(db, user_id=user_id, category_id=category_id)
     if cat is None:
         raise LookupError(f"Category {category_id} not found for user {user_id}")
+
+    from app.models.transaction import Transaction
+    in_use = db.execute(
+        select(Transaction.id).where(
+            Transaction.user_id == user_id, Transaction.category_id == category_id
+        ).limit(1)
+    ).scalar_one_or_none()
+    if in_use is not None:
+        raise PermissionError(f"Category {category_id} is in use by transactions")
+
     db.delete(cat)
     db.commit()
