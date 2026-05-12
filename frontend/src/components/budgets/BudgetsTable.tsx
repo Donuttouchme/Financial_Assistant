@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Check, X, AlertTriangle } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -73,6 +74,7 @@ export function BudgetsTable({ month }: Props) {
         { onSettled: () => setEditing(null) },
       );
     } catch {
+      toast.error("Invalid amount");
       setEditing(null);
     }
   }
