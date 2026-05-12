@@ -58,5 +58,5 @@ def run_due_schedules(db: Session, *, today: date) -> list[Transaction]:
     db.commit()
     for tx in created:
         db.refresh(tx)
-    created.sort(key=lambda t: t.date)
+    created.sort(key=lambda t: (t.date, t.id))
     return created
