@@ -30,3 +30,25 @@ def db_session():
         session.close()
         Base.metadata.drop_all(engine)
         engine.dispose()
+
+
+from fastapi.testclient import TestClient
+
+from app.dependencies import get_current_user_id
+from app.database import get_db
+from app.main import app
+
+
+@pytest.fixture
+def client(db_session):
+    def override_db():
+        yield db_session
+
+    def override_user():
+        return 1
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_current_user_id] = override_user
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
