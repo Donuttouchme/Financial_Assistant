@@ -26,5 +26,7 @@ frontend/dist/
 htmlcov/
 .pytest_cache/
 
-# Runtime launcher log
+# Runtime launcher logs
 scripts/start-error.log
+scripts/uvicorn-stdout.log
+scripts/uvicorn-stderr.log
