@@ -57,3 +57,30 @@ def test_delete_category_referenced_by_transaction_returns_409(client, db_sessio
     response = client.delete(f"/api/categories/{cat_id}")
     assert response.status_code == 409
     assert "in use" in response.json()["detail"].lower()
+
+
+def test_create_category_returns_kind_default_expense(client):
+    body = client.post("/api/categories", json={"name": "Groceries"}).json()
+    assert body["kind"] == "expense"
+
+
+def test_create_category_with_income_kind(client):
+    body = client.post(
+        "/api/categories", json={"name": "Salary", "kind": "income"}
+    ).json()
+    assert body["kind"] == "income"
+
+
+def test_create_category_rejects_invalid_kind(client):
+    response = client.post(
+        "/api/categories", json={"name": "Bad", "kind": "loan"}
+    )
+    assert response.status_code == 422
+
+
+def test_list_categories_exposes_kind(client):
+    client.post("/api/categories", json={"name": "Salary", "kind": "income"})
+    client.post("/api/categories", json={"name": "Rent"})  # default expense
+    rows = client.get("/api/categories").json()
+    by_name = {c["name"]: c["kind"] for c in rows}
+    assert by_name == {"Salary": "income", "Rent": "expense"}

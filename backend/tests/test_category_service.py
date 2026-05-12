@@ -34,3 +34,22 @@ def test_delete_category_removes_it(db_session):
 def test_delete_unknown_category_raises_lookup_error(db_session):
     with pytest.raises(LookupError):
         category_service.delete_category(db_session, user_id=1, category_id=999)
+
+
+def test_create_category_defaults_kind_to_expense(db_session):
+    cat = category_service.create_category(db_session, user_id=1, name="Groceries")
+    assert cat.kind == "expense"
+
+
+def test_create_category_accepts_income_kind(db_session):
+    cat = category_service.create_category(
+        db_session, user_id=1, name="Salary", kind="income"
+    )
+    assert cat.kind == "income"
+
+
+def test_create_category_rejects_invalid_kind(db_session):
+    with pytest.raises(ValueError, match="kind"):
+        category_service.create_category(
+            db_session, user_id=1, name="Bad", kind="loan"
+        )

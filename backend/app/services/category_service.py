@@ -3,15 +3,22 @@ from sqlalchemy.orm import Session
 
 from app.models.category import Category
 
+_VALID_KINDS = ("income", "expense")
 
-def create_category(db: Session, *, user_id: int, name: str) -> Category:
+
+def create_category(
+    db: Session, *, user_id: int, name: str, kind: str = "expense"
+) -> Category:
+    if kind not in _VALID_KINDS:
+        raise ValueError(f"kind must be one of {_VALID_KINDS}, got {kind!r}")
+
     existing = db.execute(
         select(Category).where(Category.user_id == user_id, Category.name == name)
     ).scalar_one_or_none()
     if existing is not None:
         raise ValueError(f"Category '{name}' already exists for user {user_id}")
 
-    cat = Category(user_id=user_id, name=name)
+    cat = Category(user_id=user_id, name=name, kind=kind)
     db.add(cat)
     db.commit()
     db.refresh(cat)
