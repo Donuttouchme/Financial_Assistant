@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/select";
 import { useUrlMonth } from "@/hooks/useUrlMonth";
 import { monthOptions } from "@/lib/date";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface HeaderProps {
   onAddTransaction: () => void;
@@ -29,10 +30,13 @@ export function Header({ onAddTransaction }: HeaderProps) {
         </SelectContent>
       </Select>
 
-      <Button onClick={onAddTransaction} size="sm">
-        <Plus className="h-4 w-4 mr-1" />
-        Add transaction
-      </Button>
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <Button onClick={onAddTransaction} size="sm">
+          <Plus className="h-4 w-4 mr-1" />
+          Add transaction
+        </Button>
+      </div>
     </header>
   );
 }
