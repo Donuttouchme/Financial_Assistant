@@ -90,3 +90,14 @@ def test_list_budgets_excludes_transactions_outside_month(db_session, groceries)
     assert rows[0].spent == Decimal("0")
     assert rows[0].over_budget is False
     assert rows[0].overage == Decimal("0")
+
+
+def test_set_budget_rejects_income_category(db_session):
+    salary = category_service.create_category(
+        db_session, user_id=1, name="Salary", kind="income"
+    )
+    with pytest.raises(ValueError, match="expense"):
+        budget_service.set_budget(
+            db_session, user_id=1, category_id=salary.id,
+            month="2026-05", monthly_limit=Decimal("1000"),
+        )

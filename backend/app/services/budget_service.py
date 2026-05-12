@@ -17,12 +17,17 @@ def _validate_month(month: str) -> None:
         raise ValueError(f"month must be YYYY-MM, got {month!r}")
 
 
-def _ensure_category(db: Session, *, user_id: int, category_id: int) -> Category:
+def _ensure_expense_category(db: Session, *, user_id: int, category_id: int) -> Category:
     cat = db.execute(
         select(Category).where(Category.id == category_id, Category.user_id == user_id)
     ).scalar_one_or_none()
     if cat is None:
         raise LookupError(f"Category {category_id} not found for user {user_id}")
+    if cat.kind != "expense":
+        raise ValueError(
+            f"Category {category_id} is kind={cat.kind!r}; "
+            "budgets only apply to expense categories"
+        )
     return cat
 
 
@@ -35,7 +40,7 @@ def set_budget(
     monthly_limit: Decimal,
 ) -> BudgetLimit:
     _validate_month(month)
-    _ensure_category(db, user_id=user_id, category_id=category_id)
+    _ensure_expense_category(db, user_id=user_id, category_id=category_id)
     monthly_limit = monthly_limit.quantize(Decimal("0.01"))
 
     existing = db.execute(

@@ -66,3 +66,15 @@ def test_get_budgets_for_month_without_budgets_returns_empty(client):
     response = client.get("/api/budgets", params={"month": "2026-05"})
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_put_budget_on_income_category_returns_400(client):
+    cat_id = client.post(
+        "/api/categories", json={"name": "Salary", "kind": "income"}
+    ).json()["id"]
+    response = client.put(
+        f"/api/budgets/{cat_id}",
+        json={"month": "2026-05", "monthly_limit": "1000"},
+    )
+    assert response.status_code == 400
+    assert "expense" in response.json()["detail"].lower()
