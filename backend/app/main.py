@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 import app.models  # noqa: F401 — register models with Base.metadata
 from app.database import Base, SessionLocal, engine
-from app.routers import budgets, categories, health, transactions
+from app.routers import budgets, categories, export, health, transactions
 from app.services import recurring_service
 
 
@@ -25,3 +25,4 @@ app.include_router(health.router)
 app.include_router(categories.router)
 app.include_router(transactions.router)
 app.include_router(budgets.router)
+app.include_router(export.router)
