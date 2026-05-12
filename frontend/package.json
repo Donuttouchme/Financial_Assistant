@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "concurrently -n be,fe -c blue,green \"npm:dev:backend\" \"npm:dev\"",
+    "dev:backend": "powershell -NoProfile -Command \"cd ../backend; ./.venv/Scripts/Activate.ps1; uvicorn app.main:app --reload --port 8000\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
