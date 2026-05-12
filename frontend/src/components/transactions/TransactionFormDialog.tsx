@@ -106,7 +106,7 @@ export function TransactionFormDialog(props: Props) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isEdit]);
+  }, [open, isEdit, isEdit ? props.transaction.id : null]);
 
   function onSubmit(values: FormValues) {
     const amount = parseChfInput(values.amount);
