@@ -49,6 +49,8 @@ def client(db_session):
 
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[get_current_user_id] = override_user
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        app.dependency_overrides.clear()
