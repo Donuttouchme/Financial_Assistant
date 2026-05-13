@@ -53,3 +53,40 @@ def test_create_category_rejects_invalid_kind(db_session):
         category_service.create_category(
             db_session, user_id=1, name="Bad", kind="loan"
         )
+
+
+def test_create_savings_category_accepted(db_session):
+    from decimal import Decimal
+    cat = category_service.create_category(
+        db_session, user_id=1, name="Pillar 3a", kind="savings"
+    )
+    assert cat.kind == "savings"
+    assert cat.target_amount is None
+    assert cat.target_date is None
+
+
+def test_create_savings_category_with_target(db_session):
+    from datetime import date
+    from decimal import Decimal
+    cat = category_service.create_category(
+        db_session,
+        user_id=1,
+        name="Vacation 2027",
+        kind="savings",
+        target_amount=Decimal("3000.00"),
+        target_date=date(2027, 6, 30),
+    )
+    assert cat.target_amount == Decimal("3000.00")
+    assert cat.target_date == date(2027, 6, 30)
+
+
+def test_create_category_rejects_target_on_expense(db_session):
+    from decimal import Decimal
+    with pytest.raises(ValueError, match="target.*savings"):
+        category_service.create_category(
+            db_session,
+            user_id=1,
+            name="Groceries",
+            kind="expense",
+            target_amount=Decimal("100.00"),
+        )
