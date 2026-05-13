@@ -108,3 +108,63 @@ def test_delete_transaction_removes_it(db_session, groceries):
     )
     transaction_service.delete_transaction(db_session, user_id=1, transaction_id=tx.id)
     assert transaction_service.list_transactions(db_session, user_id=1) == []
+
+
+def test_create_transaction_accepts_negative_amount_for_savings(db_session):
+    cat = category_service.create_category(
+        db_session, user_id=1, name="Emergency", kind="savings"
+    )
+    tx = transaction_service.create_transaction(
+        db_session,
+        user_id=1,
+        amount=Decimal("-200.00"),
+        tx_date=date(2026, 5, 13),
+        category_id=cat.id,
+        description="Used for car repair",
+    )
+    assert tx.amount == Decimal("-200.00")
+
+
+def test_create_transaction_accepts_positive_amount_for_savings(db_session):
+    cat = category_service.create_category(
+        db_session, user_id=1, name="Vacation 2027", kind="savings"
+    )
+    tx = transaction_service.create_transaction(
+        db_session,
+        user_id=1,
+        amount=Decimal("500.00"),
+        tx_date=date(2026, 5, 13),
+        category_id=cat.id,
+        description="May deposit",
+    )
+    assert tx.amount == Decimal("500.00")
+
+
+def test_create_transaction_rejects_negative_amount_for_expense(db_session):
+    cat = category_service.create_category(
+        db_session, user_id=1, name="Groceries Neg", kind="expense"
+    )
+    with pytest.raises(ValueError, match="must be > 0"):
+        transaction_service.create_transaction(
+            db_session,
+            user_id=1,
+            amount=Decimal("-50.00"),
+            tx_date=date(2026, 5, 13),
+            category_id=cat.id,
+            description="bad input",
+        )
+
+
+def test_create_transaction_rejects_zero_amount_for_savings(db_session):
+    cat = category_service.create_category(
+        db_session, user_id=1, name="Vacation 2028", kind="savings"
+    )
+    with pytest.raises(ValueError, match="non-zero"):
+        transaction_service.create_transaction(
+            db_session,
+            user_id=1,
+            amount=Decimal("0"),
+            tx_date=date(2026, 5, 13),
+            category_id=cat.id,
+            description="zero is meaningless",
+        )

@@ -42,9 +42,13 @@ def create_transaction(
     description: str,
     is_recurring: bool = False,
 ) -> Transaction:
-    if amount <= Decimal("0"):
-        raise ValueError("amount must be > 0")
-    _ensure_category(db, user_id=user_id, category_id=category_id)
+    cat = _ensure_category(db, user_id=user_id, category_id=category_id)
+    if cat.kind == "savings":
+        if amount == Decimal("0"):
+            raise ValueError("amount must be non-zero")
+    else:
+        if amount <= Decimal("0"):
+            raise ValueError("amount must be > 0")
 
     tx = Transaction(
         user_id=user_id,
@@ -106,13 +110,23 @@ def update_transaction(
         raise LookupError(f"Transaction {transaction_id} not found for user {user_id}")
 
     if amount is not None:
-        if amount <= Decimal("0"):
-            raise ValueError("amount must be > 0")
+        # Determine the effective category (new one if category_id is also changing,
+        # otherwise the transaction's current category).
+        effective_cat_id = category_id if category_id is not None else tx.category_id
+        effective_cat = _ensure_category(db, user_id=user_id, category_id=effective_cat_id)
+        if effective_cat.kind == "savings":
+            if amount == Decimal("0"):
+                raise ValueError("amount must be non-zero")
+        else:
+            if amount <= Decimal("0"):
+                raise ValueError("amount must be > 0")
         tx.amount = _quantize_money(amount)
     if tx_date is not None:
         tx.date = tx_date
     if category_id is not None:
-        _ensure_category(db, user_id=user_id, category_id=category_id)
+        if amount is None:
+            # Validate category ownership only (amount not changing, already validated above).
+            _ensure_category(db, user_id=user_id, category_id=category_id)
         tx.category_id = category_id
     if description is not None:
         tx.description = description
