@@ -22,7 +22,8 @@ describe("ImportConfigPanel", () => {
     fireEvent.click(screen.getByLabelText(/delimiter/i));
     fireEvent.click(screen.getByRole("option", { name: "," }));
     expect(onChange).toHaveBeenCalled();
-    const next = onChange.mock.calls.at(-1)![0];
+    const calls = onChange.mock.calls;
+    const next = calls[calls.length - 1][0];
     expect(next.delimiter).toBe(",");
   });
 });

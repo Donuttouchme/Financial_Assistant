@@ -44,10 +44,16 @@ export const handlers = [
         { status: 400 },
       );
     }
+    const kindIn = body.kind;
+    const kind: Category["kind"] =
+      kindIn === "income" ? "income" :
+      kindIn === "savings" ? "savings" : "expense";
     const cat: Category = {
       id: testState.nextCatId++,
       name: body.name,
-      kind: (body.kind === "income" ? "income" : "expense"),
+      kind,
+      target_amount: null,
+      target_date: null,
       created_at: new Date().toISOString(),
     };
     testState.categories.push(cat);

@@ -8,19 +8,16 @@ type CheckboxChecked = boolean | "indeterminate"
 interface CheckboxProps
   extends Omit<
     React.ButtonHTMLAttributes<HTMLButtonElement>,
-    "type" | "onChange" | "value"
+    "type" | "onChange" | "value" | "defaultChecked"
   > {
   checked?: CheckboxChecked
-  defaultChecked?: CheckboxChecked
   onCheckedChange?: (checked: boolean) => void
 }
 
 const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
-  ({ className, checked, defaultChecked, onCheckedChange, disabled, ...props }, ref) => {
+  ({ className, checked, onCheckedChange, disabled, ...props }, ref) => {
     const isControlled = checked !== undefined
-    const [internal, setInternal] = React.useState<CheckboxChecked>(
-      defaultChecked ?? false,
-    )
+    const [internal, setInternal] = React.useState<CheckboxChecked>(false)
     const value = isControlled ? checked : internal
     const isChecked = value === true
     const isMixed = value === "indeterminate"

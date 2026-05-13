@@ -86,7 +86,8 @@ describe("ImportPreviewTable", () => {
     ) as HTMLElement;
     fireEvent.click(spotifyCheckbox);
 
-    const lastCall = onSelectionsChange.mock.calls.at(-1)![0];
+    const calls = onSelectionsChange.mock.calls;
+    const lastCall = calls[calls.length - 1][0];
     const indexes = lastCall.map((s: { row_index: number }) => s.row_index).sort();
     expect(indexes).toEqual([0, 1]);
   });
