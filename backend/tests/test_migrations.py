@@ -31,9 +31,27 @@ def test_run_migrations_is_idempotent(tmp_path):
 
 
 def test_run_migrations_adds_missing_column_on_legacy_db():
-    eng = _engine()
-    # The Category model doesn't have these columns yet (they arrive in Task 2),
-    # so create_all already produces a table without them. No DROP needed.
+    # Simulate a pre-Task-2 legacy DB by creating the categories table without
+    # target_amount / target_date (the columns Task 1's migration runner adds).
+    eng = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    with eng.begin() as conn:
+        conn.exec_driver_sql(
+            """
+            CREATE TABLE categories (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                name VARCHAR(80) NOT NULL,
+                kind VARCHAR(16) NOT NULL DEFAULT 'expense',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT uq_user_category_name UNIQUE (user_id, name)
+            )
+            """
+        )
+
     assert "target_amount" not in _columns(eng, "categories")
     assert "target_date" not in _columns(eng, "categories")
 
