@@ -124,9 +124,14 @@ export function CategoryFormDialog({ open, onOpenChange }: Props) {
             <Label htmlFor="cat-kind">Kind</Label>
             <Select
               value={form.watch("kind")}
-              onValueChange={(v) =>
-                form.setValue("kind", v as FormValues["kind"], { shouldValidate: true })
-              }
+              onValueChange={(v) => {
+                const next = v as FormValues["kind"];
+                form.setValue("kind", next, { shouldValidate: true });
+                if (next !== "savings") {
+                  form.setValue("target_amount", "");
+                  form.setValue("target_date", "");
+                }
+              }}
             >
               <SelectTrigger id="cat-kind" aria-label="Kind">
                 <SelectValue />
