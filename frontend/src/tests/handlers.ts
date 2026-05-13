@@ -3,6 +3,7 @@ import type {
   BudgetRead,
   BudgetWithSpending,
   Category,
+  ImportPreset,
   Transaction,
 } from "@/api/types";
 
@@ -10,16 +11,20 @@ export const testState = {
   categories: [] as Category[],
   transactions: [] as Transaction[],
   budgets: [] as BudgetRead[],
+  importPresets: [] as ImportPreset[],
   nextCatId: 1,
   nextTxId: 1,
+  nextPresetId: 1,
 };
 
 export function resetTestState() {
   testState.categories = [];
   testState.transactions = [];
   testState.budgets = [];
+  testState.importPresets = [];
   testState.nextCatId = 1;
   testState.nextTxId = 1;
+  testState.nextPresetId = 1;
 }
 
 export const handlers = [
@@ -137,5 +142,55 @@ export const handlers = [
     });
 
     return HttpResponse.json(result);
+  }),
+
+  http.get("/api/import-presets", () =>
+    HttpResponse.json(testState.importPresets),
+  ),
+
+  http.post("/api/import-presets", async ({ request }) => {
+    const body = (await request.json()) as {
+      name: string;
+      config: ImportPreset["config"];
+    };
+    const preset: ImportPreset = {
+      id: testState.nextPresetId++,
+      name: body.name,
+      config: body.config,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    testState.importPresets.push(preset);
+    return HttpResponse.json(preset, { status: 201 });
+  }),
+
+  http.put("/api/import-presets/:id", async ({ params, request }) => {
+    const id = Number(params.id);
+    const idx = testState.importPresets.findIndex((p) => p.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as {
+      name: string;
+      config: ImportPreset["config"];
+    };
+    const updated: ImportPreset = {
+      ...testState.importPresets[idx],
+      name: body.name,
+      config: body.config,
+      updated_at: new Date().toISOString(),
+    };
+    testState.importPresets[idx] = updated;
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/import-presets/:id", ({ params }) => {
+    const id = Number(params.id);
+    const idx = testState.importPresets.findIndex((p) => p.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "not found" }, { status: 404 });
+    }
+    testState.importPresets.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
   }),
 ];
