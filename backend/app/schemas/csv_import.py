@@ -35,6 +35,7 @@ class ParsedRow(BaseModel):
     description: str = ""
     amount: Optional[Decimal] = None
     kind_hint: Optional[Literal["income", "expense"]] = None
+    is_duplicate: bool = False
     errors: list[str] = Field(default_factory=list)
 
 

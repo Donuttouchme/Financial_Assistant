@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 import app.models  # noqa: F401 — register models with Base.metadata
 from app.database import Base, SessionLocal, engine
 from app.migrations import run_migrations
-from app.routers import budgets, categories, export, health, import_presets, transactions
+from app.routers import budgets, categories, csv_import, export, health, import_presets, transactions
 from app.services import recurring_service
 
 
@@ -46,6 +46,7 @@ app.include_router(transactions.router)
 app.include_router(budgets.router)
 app.include_router(export.router)
 app.include_router(import_presets.router)
+app.include_router(csv_import.router)
 
 
 # Conditional SPA mount — only in prod-local mode where the frontend has been built.
