@@ -168,3 +168,92 @@ def test_create_transaction_rejects_zero_amount_for_savings(db_session):
             category_id=cat.id,
             description="zero is meaningless",
         )
+
+
+def test_update_transaction_accepts_negative_amount_for_savings(db_session):
+    cat = category_service.create_category(
+        db_session, user_id=1, name="Emergency", kind="savings"
+    )
+    tx = transaction_service.create_transaction(
+        db_session,
+        user_id=1,
+        amount=Decimal("100.00"),
+        tx_date=date(2026, 5, 13),
+        category_id=cat.id,
+        description="deposit",
+    )
+    updated = transaction_service.update_transaction(
+        db_session, user_id=1, transaction_id=tx.id, amount=Decimal("-50.00")
+    )
+    assert updated.amount == Decimal("-50.00")
+
+
+def test_update_transaction_rejects_zero_amount_for_savings(db_session):
+    cat = category_service.create_category(
+        db_session, user_id=1, name="Emergency2", kind="savings"
+    )
+    tx = transaction_service.create_transaction(
+        db_session,
+        user_id=1,
+        amount=Decimal("100.00"),
+        tx_date=date(2026, 5, 13),
+        category_id=cat.id,
+        description="deposit",
+    )
+    with pytest.raises(ValueError, match="non-zero"):
+        transaction_service.update_transaction(
+            db_session, user_id=1, transaction_id=tx.id, amount=Decimal("0")
+        )
+
+
+def test_update_transaction_validates_against_new_category_kind(db_session):
+    """Cross-kind move: expense tx → savings, with negative amount in same call."""
+    expense_cat = category_service.create_category(
+        db_session, user_id=1, name="Groceries-T4", kind="expense"
+    )
+    savings_cat = category_service.create_category(
+        db_session, user_id=1, name="Vacation-T4", kind="savings"
+    )
+    tx = transaction_service.create_transaction(
+        db_session,
+        user_id=1,
+        amount=Decimal("50.00"),
+        tx_date=date(2026, 5, 13),
+        category_id=expense_cat.id,
+        description="x",
+    )
+    updated = transaction_service.update_transaction(
+        db_session,
+        user_id=1,
+        transaction_id=tx.id,
+        amount=Decimal("-25.00"),
+        category_id=savings_cat.id,
+    )
+    assert updated.amount == Decimal("-25.00")
+    assert updated.category_id == savings_cat.id
+
+
+def test_update_transaction_reparent_rejects_invalid_existing_amount(db_session):
+    """Re-parent: savings tx with negative amount → expense category, no amount change.
+
+    Before the fix this silently succeeded, leaving a negative-amount tx in an
+    expense category — violating the invariant.
+    """
+    savings_cat = category_service.create_category(
+        db_session, user_id=1, name="Emergency3", kind="savings"
+    )
+    expense_cat = category_service.create_category(
+        db_session, user_id=1, name="Rent-T4", kind="expense"
+    )
+    tx = transaction_service.create_transaction(
+        db_session,
+        user_id=1,
+        amount=Decimal("-100.00"),
+        tx_date=date(2026, 5, 13),
+        category_id=savings_cat.id,
+        description="withdraw",
+    )
+    with pytest.raises(ValueError, match="must be > 0"):
+        transaction_service.update_transaction(
+            db_session, user_id=1, transaction_id=tx.id, category_id=expense_cat.id
+        )
