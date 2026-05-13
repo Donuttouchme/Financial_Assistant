@@ -1,15 +1,19 @@
-export type CategoryKind = "income" | "expense";
+export type CategoryKind = "income" | "expense" | "savings";
 
 export interface Category {
   id: number;
   name: string;
   kind: CategoryKind;
+  target_amount: string | null;
+  target_date: string | null;  // ISO YYYY-MM-DD
   created_at: string;
 }
 
 export interface CategoryCreatePayload {
   name: string;
   kind?: CategoryKind;
+  target_amount?: string | null;
+  target_date?: string | null;
 }
 
 export interface Transaction {
