@@ -53,6 +53,33 @@
     --ring: 240 5% 65%;
   }
 
+  .sakura {
+    --background: 290 30% 8%;
+    --foreground: 0 0% 96%;
+    --card: 290 25% 12%;
+    --card-foreground: 0 0% 96%;
+    --popover: 290 25% 12%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 340 65% 68%;
+    --primary-foreground: 290 20% 10%;
+    --secondary: 320 30% 22%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 290 20% 18%;
+    --muted-foreground: 320 15% 65%;
+    --accent: 320 30% 22%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 0 60% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 290 20% 22%;
+    --input: 290 20% 22%;
+    --ring: 340 50% 60%;
+    --chart-1: 340 65% 68%;
+    --chart-2: 280 50% 65%;
+    --chart-3: 320 55% 70%;
+    --chart-4:  10 65% 70%;
+    --chart-5: 260 40% 55%;
+  }
+
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
 }
