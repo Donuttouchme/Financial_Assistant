@@ -6,7 +6,7 @@ Personal finance tracker — single user, local-first. CHF-denominated. FastAPI 
 
 ## Two ways to run
 
-### A) End-user / spouse mode (one click)
+### A) End-user (one click)
 
 Goal: open the app like any other program. No terminals.
 
