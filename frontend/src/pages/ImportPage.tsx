@@ -10,6 +10,7 @@ import {
 import { CsvHelpPanel } from "@/components/imports/CsvHelpPanel";
 import { ImportConfigPanel } from "@/components/imports/ImportConfigPanel";
 import { ImportPreviewTable } from "@/components/imports/ImportPreviewTable";
+import { PresetSelector } from "@/components/imports/PresetSelector";
 import {
   useCategories,
   useCreateCategory,
@@ -122,6 +123,8 @@ export default function ImportPage() {
             <CardTitle>2. Configure</CardTitle>
           </CardHeader>
           <CardContent>
+            <PresetSelector currentConfig={config} onLoad={setConfig} />
+            <div className="my-3 border-t" />
             <ImportConfigPanel config={config} onChange={setConfig} />
             <div className="mt-4">
               <Button onClick={handlePreview}>Preview</Button>
