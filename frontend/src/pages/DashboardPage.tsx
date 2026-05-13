@@ -3,6 +3,7 @@ import { OverBudgetAlerts } from "@/components/dashboard/OverBudgetAlerts";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { CategoryDonut } from "@/components/dashboard/CategoryDonut";
 import { MonthlyTrendBar } from "@/components/dashboard/MonthlyTrendBar";
+import { SavingsGoalsRow } from "@/components/dashboard/SavingsGoalsRow";
 import { useUrlMonth } from "@/hooks/useUrlMonth";
 import { monthLabel } from "@/lib/date";
 
@@ -14,6 +15,7 @@ export default function DashboardPage() {
         Dashboard — {monthLabel(month)}
       </h2>
       <KpiRow month={month} />
+      <SavingsGoalsRow month={month} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CategoryDonut month={month} />
         <MonthlyTrendBar month={month} />
