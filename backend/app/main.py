@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -9,9 +10,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Scope
 
 import app.models  # noqa: F401 — register models with Base.metadata
+from app import idle
 from app.database import Base, SessionLocal, engine
 from app.migrations import run_migrations
-from app.routers import budgets, categories, csv_import, export, health, import_presets, transactions
+from app.routers import budgets, categories, csv_import, export, health, heartbeat, import_presets, transactions
 from app.services import recurring_service
 
 
@@ -29,7 +31,15 @@ async def lifespan(app: FastAPI):
         recurring_service.run_due_schedules(db, today=date.today())
     finally:
         db.close()
-    yield
+    watchdog_task = idle.start_watchdog()
+    try:
+        yield
+    finally:
+        watchdog_task.cancel()
+        try:
+            await watchdog_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Financial Assistant API", version="0.1.0", lifespan=lifespan)
@@ -42,7 +52,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def _track_activity(request, call_next):
+    idle.record_activity()
+    return await call_next(request)
+
+
 app.include_router(health.router)
+app.include_router(heartbeat.router)
 app.include_router(categories.router)
 app.include_router(transactions.router)
 app.include_router(budgets.router)

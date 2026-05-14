@@ -8,12 +8,14 @@ class Base(DeclarativeBase):
     pass
 
 
+_db_url = settings.resolved_database_url()
+
 engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False} if settings.database_url.startswith("sqlite") else {},
+    _db_url,
+    connect_args={"check_same_thread": False} if _db_url.startswith("sqlite") else {},
 )
 
-if settings.database_url.startswith("sqlite"):
+if _db_url.startswith("sqlite"):
     @event.listens_for(engine, "connect")
     def _enable_sqlite_fk(dbapi_connection, _):
         cursor = dbapi_connection.cursor()
