@@ -5,6 +5,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import Scope
 
 import app.models  # noqa: F401 — register models with Base.metadata
 from app.database import Base, SessionLocal, engine
@@ -49,12 +51,23 @@ app.include_router(import_presets.router)
 app.include_router(csv_import.router)
 
 
-# Conditional SPA mount — only in prod-local mode where the frontend has been built.
-# `html=True` makes StaticFiles serve index.html for unknown paths, which is what
-# the React Router expects (refresh on /transactions must not 404).
+# SPA fallback: StaticFiles(html=True) only serves index.html for directory roots,
+# not for arbitrary unknown paths. A hard-refresh on /dashboard or /transactions
+# would otherwise return 404. Catch 404s from the static mount and serve
+# index.html so React Router can handle the route on the client.
+class _SPAStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope: Scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as ex:
+            if ex.status_code == 404 and not path.startswith("api"):
+                return await super().get_response("index.html", scope)
+            raise
+
+
 if _FRONTEND_DIST.is_dir():
     app.mount(
         "/",
-        StaticFiles(directory=str(_FRONTEND_DIST), html=True),
+        _SPAStaticFiles(directory=str(_FRONTEND_DIST), html=True),
         name="frontend",
     )
