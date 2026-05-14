@@ -11,7 +11,7 @@ from starlette.types import Scope
 import app.models  # noqa: F401 — register models with Base.metadata
 from app.database import Base, SessionLocal, engine
 from app.migrations import run_migrations
-from app.routers import budgets, categories, csv_import, export, health, import_presets, transactions
+from app.routers import budgets, categories, csv_import, export, health, heartbeat, import_presets, transactions
 from app.services import recurring_service
 
 
@@ -43,6 +43,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(heartbeat.router)
 app.include_router(categories.router)
 app.include_router(transactions.router)
 app.include_router(budgets.router)
