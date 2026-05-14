@@ -93,8 +93,14 @@ try {
         Fail "Backend did not respond on http://127.0.0.1:8000 within 10 seconds.`n`nLog tail:`n$tail"
     }
 
-    # Open the browser. `localhost` is fine here — browsers handle dual-stack.
-    Start-Process "http://localhost:8000"
+    # Open the browser with a per-launch cache-buster query.
+    # Reason: even with no-cache headers, browsers restore the previous session's
+    # tab from memory / bfcache and skip the network entirely on relaunch — so
+    # the user sees the old UI until they manually reload. A unique query string
+    # forces a fresh URL on every launch, which the browser can't satisfy from
+    # cache. `localhost` is fine here — browsers handle dual-stack.
+    $launchToken = [DateTimeOffset]::Now.ToUnixTimeSeconds()
+    Start-Process "http://localhost:8000/?v=$launchToken"
 
     # Block until uvicorn exits.
     Wait-Process -Id $uv.Id
