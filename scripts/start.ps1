@@ -33,7 +33,7 @@ function Fail($message) {
 }
 
 # Kills a process and all descendants. Used on shutdown / failure so we don't
-# leave an orphan uvicorn holding port 8000 — Stop-Process only kills the direct
+# leave an orphan uvicorn holding port 8000 - Stop-Process only kills the direct
 # PID and leaks grandchildren on Windows.
 function Stop-Tree($processId) {
     if ($processId) {
@@ -41,7 +41,7 @@ function Stop-Tree($processId) {
     }
 }
 
-# Pre-check: is port 8000 free? Filter to State=Listen — leftover client sockets
+# Pre-check: is port 8000 free? Filter to State=Listen - leftover client sockets
 # from a previous run sit in FinWait2/TimeWait for ~30s and would otherwise make
 # this look busy when no one is actually listening.
 $portBusy = $null -ne (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)
@@ -65,7 +65,7 @@ if ($portBusy) {
     Fail "Port 8000 is already in use by another program. Close it from Task Manager and try again."
 }
 
-# Build the frontend if dist is missing — cheap to skip when fresh.
+# Build the frontend if dist is missing - cheap to skip when fresh.
 if (-not (Test-Path "frontend\dist\index.html")) {
     "[$([DateTime]::Now)] frontend/dist missing - building..." | Out-File -FilePath $logPath -Append -Encoding utf8
     Push-Location frontend
@@ -83,7 +83,7 @@ if (-not (Test-Path "frontend\dist\index.html")) {
 # the venv's uvicorn.exe shim as before.
 if ($PythonExe) {
     if (-not (Test-Path $PythonExe)) {
-        Fail "Embedded Python not found at $PythonExe. The portable install may be corrupt — try reinstalling."
+        Fail "Embedded Python not found at $PythonExe. The portable install may be corrupt - try reinstalling."
     }
     $uvicornCmd = $PythonExe
     $uvicornArgs = @("-m", "uvicorn", "app.main:app", "--port", "8000")
@@ -110,7 +110,7 @@ $uv = Start-Process -FilePath $uvicornCmd `
     -PassThru
 
 try {
-    # Wait up to 10s for /api/health. Use 127.0.0.1 explicitly — `localhost` resolves
+    # Wait up to 10s for /api/health. Use 127.0.0.1 explicitly - `localhost` resolves
     # to ::1 first on Windows, but uvicorn binds only to 127.0.0.1, and PS 5.1's
     # Invoke-WebRequest doesn't do Happy Eyeballs, so each `localhost` attempt
     # burns its full TimeoutSec on the IPv6 failure.
@@ -132,10 +132,10 @@ try {
 
     # Open the browser with a per-launch cache-buster query.
     # Reason: even with no-cache headers, browsers restore the previous session's
-    # tab from memory / bfcache and skip the network entirely on relaunch — so
+    # tab from memory / bfcache and skip the network entirely on relaunch - so
     # the user sees the old UI until they manually reload. A unique query string
     # forces a fresh URL on every launch, which the browser can't satisfy from
-    # cache. `localhost` is fine here — browsers handle dual-stack.
+    # cache. `localhost` is fine here - browsers handle dual-stack.
     $launchToken = [DateTimeOffset]::Now.ToUnixTimeSeconds()
     Start-Process "http://localhost:8000/?v=$launchToken"
 

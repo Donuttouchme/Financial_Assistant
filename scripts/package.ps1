@@ -74,6 +74,22 @@ New-Item -ItemType Directory -Force -Path $appScripts | Out-Null
 Copy-Item (Join-Path $root "scripts\start.ps1") $appScripts
 Copy-Item (Join-Path $root "scripts\stop.ps1") $appScripts
 
+# 5b) Parse-check the staged scripts via -File invocation semantics.
+# PowerShell 5.1's `-File` reads .ps1 as system ANSI codepage, NOT UTF-8.
+# UTF-8 non-ASCII characters (em-dash, smart quotes) get mojibaked into
+# byte sequences that can include curly quotes (U+201D), which the parser
+# treats as string delimiters - silently breaking the file when the installer
+# tries to launch it. Doing the parse via `Get-Content -Raw` here reproduces
+# the same ANSI decoding, so we fail the build if any non-ASCII slips in.
+foreach ($script in @("start.ps1", "stop.ps1")) {
+    $staged = Join-Path $appScripts $script
+    try {
+        $null = [scriptblock]::Create((Get-Content $staged -Raw))
+    } catch {
+        throw "Parse-check FAILED for $script. Likely cause: non-ASCII character (em-dash, smart quote) in the file. Replace with plain ASCII before re-running. Underlying error: $($_.Exception.Message)"
+    }
+}
+
 # 6) Stage friend-facing root templates (RUN.bat, STOP.bat, README.txt)
 Write-Host "[6/N] Staging RUN.bat, STOP.bat, README.txt..."
 Copy-Item (Join-Path $root "scripts\portable\RUN.bat") $staging
