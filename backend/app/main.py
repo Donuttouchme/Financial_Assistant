@@ -51,18 +51,42 @@ app.include_router(import_presets.router)
 app.include_router(csv_import.router)
 
 
-# SPA fallback: StaticFiles(html=True) only serves index.html for directory roots,
-# not for arbitrary unknown paths. A hard-refresh on /dashboard or /transactions
-# would otherwise return 404. Catch 404s from the static mount and serve
-# index.html so React Router can handle the route on the client.
+# SPA fallback + cache headers.
+#
+# (1) StaticFiles(html=True) only serves index.html as a directory default,
+#     not as a fallback for arbitrary unknown paths. A hard-refresh on
+#     /dashboard would otherwise return 404. Catch 404s and serve index.html
+#     so React Router can handle the route on the client.
+#
+# (2) The launcher rebuilds frontend/dist on every release, but the served
+#     HTML always references new hashed asset filenames. If the browser
+#     caches index.html, on next start it loads stale HTML pointing at the
+#     previous bundle URL, and the user sees the old UI until they reload.
+#     Mark index.html no-cache so the browser revalidates each load; the
+#     hashed /assets/* files are content-addressed and safe to cache forever.
 class _SPAStaticFiles(StaticFiles):
     async def get_response(self, path: str, scope: Scope):
+        served_fallback = False
         try:
-            return await super().get_response(path, scope)
+            response = await super().get_response(path, scope)
         except StarletteHTTPException as ex:
             if ex.status_code == 404 and not path.startswith("api"):
-                return await super().get_response("index.html", scope)
-            raise
+                response = await super().get_response("index.html", scope)
+                served_fallback = True
+            else:
+                raise
+
+        # Use content-type rather than path: path is platform-dependent
+        # (Windows uses backslash) and "." for the root, which makes
+        # string-prefix checks fragile.
+        normalized = path.replace("\\", "/")
+        is_html = response.headers.get("content-type", "").startswith("text/html")
+        if served_fallback or is_html:
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        elif normalized.startswith("assets/"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+
+        return response
 
 
 if _FRONTEND_DIST.is_dir():
