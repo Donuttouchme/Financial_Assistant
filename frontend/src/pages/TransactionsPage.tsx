@@ -3,6 +3,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { TransactionsTable } from "@/components/transactions/TransactionsTable";
+import { EmptyAppState } from "@/components/EmptyAppState";
 import { useUrlMonth } from "@/hooks/useUrlMonth";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { useSearchParams } from "react-router-dom";
@@ -10,7 +11,7 @@ import { monthLabel } from "@/lib/date";
 
 export default function TransactionsPage() {
   const { month } = useUrlMonth();
-  const { data: cats } = useCategories();
+  const { data: cats, isLoading } = useCategories();
   const [params, setParams] = useSearchParams();
   const catParam = params.get("category_id");
   const categoryId = catParam ? Number(catParam) : undefined;
@@ -20,6 +21,15 @@ export default function TransactionsPage() {
     if (next === "all") np.delete("category_id");
     else np.set("category_id", next);
     setParams(np);
+  }
+
+  if (!isLoading && (cats?.length ?? 0) === 0) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-semibold">Transactions</h2>
+        <EmptyAppState />
+      </div>
+    );
   }
 
   return (
