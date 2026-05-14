@@ -24,7 +24,14 @@ def create_category(
     user_id: int = Depends(get_current_user_id),
 ):
     try:
-        return category_service.create_category(db, user_id=user_id, name=payload.name, kind=payload.kind)
+        return category_service.create_category(
+            db,
+            user_id=user_id,
+            name=payload.name,
+            kind=payload.kind,
+            target_amount=payload.target_amount,
+            target_date=payload.target_date,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "sakura";
 const STORAGE_KEY = "fa-theme";
 
 function readInitialTheme(): Theme {
   if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") return stored;
+  if (stored === "light" || stored === "dark" || stored === "sakura") return stored;
   try {
     return window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
@@ -21,14 +21,14 @@ export function useTheme() {
 
   useEffect(() => {
     const root = document.documentElement;
+    root.classList.remove("dark", "sakura");
     if (theme === "dark") root.classList.add("dark");
-    else root.classList.remove("dark");
+    else if (theme === "sakura") root.classList.add("sakura");
     window.localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
   return {
     theme,
     setTheme,
-    toggle: () => setTheme((t) => (t === "light" ? "dark" : "light")),
   };
 }

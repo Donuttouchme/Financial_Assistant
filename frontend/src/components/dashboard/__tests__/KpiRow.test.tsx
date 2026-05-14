@@ -16,11 +16,12 @@ function wrap(node: React.ReactNode) {
 }
 
 describe("KpiRow", () => {
-  it("renders the four KPI labels", async () => {
+  it("renders Income, Expense, Net, Saved", async () => {
     render(wrap(<KpiRow month="2026-05" />));
     expect(await screen.findByText("Income")).toBeInTheDocument();
     expect(screen.getByText("Expense")).toBeInTheDocument();
     expect(screen.getByText("Net")).toBeInTheDocument();
-    expect(screen.getByText("Over budget")).toBeInTheDocument();
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+    expect(screen.queryByText(/Over budget/i)).toBeNull();
   });
 });

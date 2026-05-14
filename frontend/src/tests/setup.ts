@@ -11,6 +11,9 @@ globalThis.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
+// jsdom does not implement scrollIntoView; polyfill it for Radix UI Select.
+window.HTMLElement.prototype.scrollIntoView = function () {};
+
 export const server = setupServer(...handlers);
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));

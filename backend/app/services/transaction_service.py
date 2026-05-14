@@ -42,9 +42,13 @@ def create_transaction(
     description: str,
     is_recurring: bool = False,
 ) -> Transaction:
-    if amount <= Decimal("0"):
-        raise ValueError("amount must be > 0")
-    _ensure_category(db, user_id=user_id, category_id=category_id)
+    cat = _ensure_category(db, user_id=user_id, category_id=category_id)
+    if cat.kind == "savings":
+        if amount == Decimal("0"):
+            raise ValueError("amount must be non-zero")
+    else:
+        if amount <= Decimal("0"):
+            raise ValueError("amount must be > 0")
 
     tx = Transaction(
         user_id=user_id,
@@ -105,14 +109,26 @@ def update_transaction(
     if tx is None:
         raise LookupError(f"Transaction {transaction_id} not found for user {user_id}")
 
+    if amount is not None or category_id is not None:
+        # Validate the effective (post-update) amount against the effective category's kind.
+        # This covers three cases:
+        #   1. amount only changes  — check new amount vs current category kind
+        #   2. category_id only changes — check existing amount vs new category kind
+        #   3. both change           — check new amount vs new category kind
+        effective_cat_id = category_id if category_id is not None else tx.category_id
+        effective_cat = _ensure_category(db, user_id=user_id, category_id=effective_cat_id)
+        effective_amount = amount if amount is not None else tx.amount
+        if effective_cat.kind == "savings":
+            if effective_amount == Decimal("0"):
+                raise ValueError("amount must be non-zero")
+        else:
+            if effective_amount <= Decimal("0"):
+                raise ValueError("amount must be > 0")
     if amount is not None:
-        if amount <= Decimal("0"):
-            raise ValueError("amount must be > 0")
         tx.amount = _quantize_money(amount)
     if tx_date is not None:
         tx.date = tx_date
     if category_id is not None:
-        _ensure_category(db, user_id=user_id, category_id=category_id)
         tx.category_id = category_id
     if description is not None:
         tx.description = description

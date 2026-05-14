@@ -84,3 +84,42 @@ def test_list_categories_exposes_kind(client):
     rows = client.get("/api/categories").json()
     by_name = {c["name"]: c["kind"] for c in rows}
     assert by_name == {"Salary": "income", "Rent": "expense"}
+
+
+def test_post_savings_category_with_target(client):
+    r = client.post(
+        "/api/categories",
+        json={
+            "name": "Vacation 2027",
+            "kind": "savings",
+            "target_amount": "3000.00",
+            "target_date": "2027-06-30",
+        },
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["kind"] == "savings"
+    assert body["target_amount"] == "3000.00"
+    assert body["target_date"] == "2027-06-30"
+
+
+def test_post_savings_category_without_target(client):
+    r = client.post(
+        "/api/categories",
+        json={"name": "Pillar 3a", "kind": "savings"},
+    )
+    assert r.status_code == 201
+    assert r.json()["target_amount"] is None
+    assert r.json()["target_date"] is None
+
+
+def test_post_target_on_expense_returns_400(client):
+    r = client.post(
+        "/api/categories",
+        json={
+            "name": "Groceries",
+            "kind": "expense",
+            "target_amount": "100.00",
+        },
+    )
+    assert r.status_code == 400

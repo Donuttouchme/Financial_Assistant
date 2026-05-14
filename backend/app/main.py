@@ -8,7 +8,8 @@ from fastapi.staticfiles import StaticFiles
 
 import app.models  # noqa: F401 — register models with Base.metadata
 from app.database import Base, SessionLocal, engine
-from app.routers import budgets, categories, export, health, transactions
+from app.migrations import run_migrations
+from app.routers import budgets, categories, csv_import, export, health, import_presets, transactions
 from app.services import recurring_service
 
 
@@ -20,6 +21,7 @@ _FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(engine)
+    run_migrations(engine)
     db = SessionLocal()
     try:
         recurring_service.run_due_schedules(db, today=date.today())
@@ -43,6 +45,8 @@ app.include_router(categories.router)
 app.include_router(transactions.router)
 app.include_router(budgets.router)
 app.include_router(export.router)
+app.include_router(import_presets.router)
+app.include_router(csv_import.router)
 
 
 # Conditional SPA mount — only in prod-local mode where the frontend has been built.

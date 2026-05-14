@@ -12,6 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCategories } from "@/hooks/queries/useCategories";
 import {
   useCreateTransaction, useUpdateTransaction,
@@ -35,6 +36,7 @@ const schema = z.object({
   category_id: z.coerce.number().int().positive("Pick a category"),
   description: z.string().max(255).default(""),
   is_recurring: z.boolean().default(false),
+  direction: z.enum(["deposit", "withdraw"]).default("deposit"),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -68,11 +70,12 @@ export function TransactionFormDialog(props: Props) {
     resolver: zodResolver(schema),
     defaultValues: isEdit
       ? {
-          amount: props.transaction.amount,
+          amount: String(Math.abs(parseFloat(props.transaction.amount))),
           date: props.transaction.date,
           category_id: props.transaction.category_id,
           description: props.transaction.description,
           is_recurring: props.transaction.is_recurring,
+          direction: parseFloat(props.transaction.amount) < 0 ? "withdraw" : "deposit",
         }
       : {
           amount: "",
@@ -80,6 +83,7 @@ export function TransactionFormDialog(props: Props) {
           category_id: 0,
           description: "",
           is_recurring: false,
+          direction: "deposit",
         },
   });
 
@@ -88,12 +92,15 @@ export function TransactionFormDialog(props: Props) {
   useEffect(() => {
     if (open) {
       if (isEdit) {
+        const amt = parseFloat(props.transaction.amount);
+        const dir = amt < 0 ? "withdraw" : "deposit";
         form.reset({
-          amount: props.transaction.amount,
+          amount: String(Math.abs(amt)),
           date: props.transaction.date,
           category_id: props.transaction.category_id,
           description: props.transaction.description,
           is_recurring: props.transaction.is_recurring,
+          direction: dir,
         });
       } else {
         form.reset({
@@ -102,14 +109,24 @@ export function TransactionFormDialog(props: Props) {
           category_id: 0,
           description: "",
           is_recurring: false,
+          direction: "deposit",
         });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isEdit, isEdit ? props.transaction.id : null]);
 
+  const selectedCategoryId = form.watch("category_id");
+  const selectedCategory = (categories ?? []).find((c) => c.id === selectedCategoryId);
+  const isSavings = selectedCategory?.kind === "savings";
+  const direction = form.watch("direction") ?? "deposit";
+
   function onSubmit(values: FormValues) {
-    const amount = parseChfInput(values.amount);
+    let amount = parseChfInput(values.amount);
+    if (selectedCategory?.kind === "savings" && values.direction === "withdraw") {
+      // Always produce a single leading minus, regardless of existing prefix.
+      amount = "-" + amount.replace(/^-/, "");
+    }
     if (isEdit) {
       update.mutate(
         {
@@ -198,6 +215,26 @@ export function TransactionFormDialog(props: Props) {
               </p>
             )}
           </div>
+
+          {isSavings && (
+            <div role="group" aria-label="Direction" className="space-y-2">
+              <Label>Direction</Label>
+              <ToggleGroup
+                type="single"
+                value={direction}
+                onValueChange={(v) => {
+                  if (v) form.setValue("direction", v as "deposit" | "withdraw");
+                }}
+              >
+                <ToggleGroupItem value="deposit" aria-label="Deposit">
+                  ↑ Deposit
+                </ToggleGroupItem>
+                <ToggleGroupItem value="withdraw" aria-label="Withdraw">
+                  ↓ Withdraw
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="tx-description">Description</Label>

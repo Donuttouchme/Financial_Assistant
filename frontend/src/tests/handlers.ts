@@ -1,24 +1,30 @@
 import { http, HttpResponse } from "msw";
 import type {
+  BudgetRead,
   BudgetWithSpending,
   Category,
+  ImportPreset,
   Transaction,
 } from "@/api/types";
 
 export const testState = {
   categories: [] as Category[],
   transactions: [] as Transaction[],
-  budgets: [] as BudgetWithSpending[],
+  budgets: [] as BudgetRead[],
+  importPresets: [] as ImportPreset[],
   nextCatId: 1,
   nextTxId: 1,
+  nextPresetId: 1,
 };
 
 export function resetTestState() {
   testState.categories = [];
   testState.transactions = [];
   testState.budgets = [];
+  testState.importPresets = [];
   testState.nextCatId = 1;
   testState.nextTxId = 1;
+  testState.nextPresetId = 1;
 }
 
 export const handlers = [
@@ -38,10 +44,16 @@ export const handlers = [
         { status: 400 },
       );
     }
+    const kindIn = body.kind;
+    const kind: Category["kind"] =
+      kindIn === "income" ? "income" :
+      kindIn === "savings" ? "savings" : "expense";
     const cat: Category = {
       id: testState.nextCatId++,
       name: body.name,
-      kind: (body.kind === "income" ? "income" : "expense"),
+      kind,
+      target_amount: null,
+      target_date: null,
       created_at: new Date().toISOString(),
     };
     testState.categories.push(cat);
@@ -104,7 +116,87 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  http.get("/api/budgets", () =>
-    HttpResponse.json(testState.budgets),
+  http.get("/api/budgets", ({ request }) => {
+    const url = new URL(request.url);
+    const month = url.searchParams.get("month");
+
+    const budgets = month
+      ? testState.budgets.filter((b) => b.month === month)
+      : testState.budgets;
+
+    const result: BudgetWithSpending[] = budgets.map((b) => {
+      const cat = testState.categories.find((c) => c.id === b.category_id);
+      const spent = testState.transactions
+        .filter(
+          (t) =>
+            t.category_id === b.category_id &&
+            (!month || t.date.startsWith(month)),
+        )
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      const limit = Number(b.monthly_limit);
+      const over_budget = spent > limit;
+      const overage = over_budget ? String(spent - limit) : "0";
+      return {
+        category_id: b.category_id,
+        category_name: cat?.name ?? `Category ${b.category_id}`,
+        month: b.month,
+        monthly_limit: b.monthly_limit,
+        spent: String(spent),
+        over_budget,
+        overage,
+      };
+    });
+
+    return HttpResponse.json(result);
+  }),
+
+  http.get("/api/import-presets", () =>
+    HttpResponse.json(testState.importPresets),
   ),
+
+  http.post("/api/import-presets", async ({ request }) => {
+    const body = (await request.json()) as {
+      name: string;
+      config: ImportPreset["config"];
+    };
+    const preset: ImportPreset = {
+      id: testState.nextPresetId++,
+      name: body.name,
+      config: body.config,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    testState.importPresets.push(preset);
+    return HttpResponse.json(preset, { status: 201 });
+  }),
+
+  http.put("/api/import-presets/:id", async ({ params, request }) => {
+    const id = Number(params.id);
+    const idx = testState.importPresets.findIndex((p) => p.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as {
+      name: string;
+      config: ImportPreset["config"];
+    };
+    const updated: ImportPreset = {
+      ...testState.importPresets[idx],
+      name: body.name,
+      config: body.config,
+      updated_at: new Date().toISOString(),
+    };
+    testState.importPresets[idx] = updated;
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/import-presets/:id", ({ params }) => {
+    const id = Number(params.id);
+    const idx = testState.importPresets.findIndex((p) => p.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "not found" }, { status: 404 });
+    }
+    testState.importPresets.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
 ];
