@@ -36,7 +36,23 @@ function Stop-Tree($processId) {
 # this look busy when no one is actually listening.
 $portBusy = $null -ne (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)
 if ($portBusy) {
-    Fail "Port 8000 is already in use. The app may already be running, or another program is holding the port. Close it from Task Manager and try again."
+    # If it's our own backend already running, just open a browser tab and exit.
+    # Identification: /api/health responds 200 with {"status":"ok"} only in our app.
+    $oursAlready = $false
+    try {
+        $r = Invoke-WebRequest "http://127.0.0.1:8000/api/health" -UseBasicParsing -TimeoutSec 2
+        if ($r.StatusCode -eq 200 -and $r.Content -match '"status"\s*:\s*"ok"') {
+            $oursAlready = $true
+        }
+    } catch { }
+
+    if ($oursAlready) {
+        $launchToken = [DateTimeOffset]::Now.ToUnixTimeSeconds()
+        Start-Process "http://localhost:8000/?v=$launchToken"
+        exit 0
+    }
+
+    Fail "Port 8000 is already in use by another program. Close it from Task Manager and try again."
 }
 
 # Build the frontend if dist is missing — cheap to skip when fresh.
