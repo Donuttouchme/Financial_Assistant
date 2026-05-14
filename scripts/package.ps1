@@ -150,3 +150,30 @@ if ($smokeRc -ne 0) { throw "Embed-Python smoke test failed" }
 
 Write-Host ""
 Write-Host "=== Stage 12 complete. Python embed ready at $pythonStage ==="
+
+# 13) Invoke Inno Setup compiler
+$isccCandidates = @(
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+    "C:\Program Files\Inno Setup 6\ISCC.exe"
+)
+$iscc = $isccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $iscc) {
+    throw "ISCC.exe not found. Install Inno Setup 6 from https://jrsoftware.org/isdl.php or via 'winget install JRSoftware.InnoSetup'."
+}
+
+Write-Host "[13/N] Running Inno Setup compiler ($iscc)..."
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& $iscc "/DMyAppVersion=$Version" (Join-Path $PSScriptRoot "installer.iss")
+$isccRc = $LASTEXITCODE
+$ErrorActionPreference = $prevEAP
+if ($isccRc -ne 0) { throw "ISCC.exe failed with exit code $isccRc" }
+
+$installerPath = Join-Path $out "Financial-Assistant-Setup-v$Version.exe"
+if (-not (Test-Path $installerPath)) {
+    throw "Inno Setup reported success but installer not found at $installerPath"
+}
+$installerSize = (Get-Item $installerPath).Length / 1MB
+Write-Host ""
+Write-Host "=== Installer built: $installerPath ($([Math]::Round($installerSize, 1)) MB) ==="
