@@ -4,11 +4,24 @@ import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { CategoryDonut } from "@/components/dashboard/CategoryDonut";
 import { MonthlyTrendBar } from "@/components/dashboard/MonthlyTrendBar";
 import { SavingsGoalsRow } from "@/components/dashboard/SavingsGoalsRow";
+import { EmptyAppState } from "@/components/EmptyAppState";
 import { useUrlMonth } from "@/hooks/useUrlMonth";
+import { useCategories } from "@/hooks/queries/useCategories";
 import { monthLabel } from "@/lib/date";
 
 export default function DashboardPage() {
   const { month } = useUrlMonth();
+  const { data: cats, isLoading } = useCategories();
+
+  if (!isLoading && (cats?.length ?? 0) === 0) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-semibold">Dashboard</h2>
+        <EmptyAppState />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-semibold">Dashboard — {monthLabel(month)}</h2>
