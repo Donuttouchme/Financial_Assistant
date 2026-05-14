@@ -32,6 +32,8 @@ export const handlers = [
     HttpResponse.json({ status: "ok" }),
   ),
 
+  http.post("/api/heartbeat", () => HttpResponse.json({ ok: true })),
+
   http.get("/api/categories", () =>
     HttpResponse.json(testState.categories),
   ),
