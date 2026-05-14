@@ -31,8 +31,10 @@ function Stop-Tree($processId) {
     }
 }
 
-# Pre-check: is port 8000 free?
-$portBusy = $null -ne (Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue)
+# Pre-check: is port 8000 free? Filter to State=Listen — leftover client sockets
+# from a previous run sit in FinWait2/TimeWait for ~30s and would otherwise make
+# this look busy when no one is actually listening.
+$portBusy = $null -ne (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)
 if ($portBusy) {
     Fail "Port 8000 is already in use. The app may already be running, or another program is holding the port. Close it from Task Manager and try again."
 }
