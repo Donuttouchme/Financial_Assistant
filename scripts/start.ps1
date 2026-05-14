@@ -2,9 +2,19 @@
 # Failure modes show a Windows MessageBox; full details go to scripts/start-error.log
 # and scripts/uvicorn-stderr.log (uvicorn writes its INFO output to stderr).
 # Assumes: frontend has been built into frontend/dist (the StaticFiles mount picks it up).
+#
+# When invoked from the portable installer's RUN.bat, -PythonExe and -BackendDir
+# point at the embedded interpreter + the installed backend code. When invoked
+# from the dev's scripts/start.bat (no params), falls back to the venv's
+# uvicorn.exe shim and ./backend.
 
+param(
+    [string]$PythonExe = "",
+    [string]$BackendDir = ""
+)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
+if (-not $BackendDir) { $BackendDir = Join-Path $root "backend" }
 Set-Location $root
 $logPath = Join-Path $PSScriptRoot "start-error.log"
 $uvOutLog = Join-Path $PSScriptRoot "uvicorn-stdout.log"
@@ -68,21 +78,32 @@ if (-not (Test-Path "frontend\dist\index.html")) {
     }
 }
 
-# Resolve the venv's uvicorn launcher directly. Bypasses Activate.ps1 (which
-# can hit ExecutionPolicy issues inside background jobs) and gives us a real
-# PID we can track + kill the tree of on failure.
-$uvicornExe = Join-Path $root "backend\.venv\Scripts\uvicorn.exe"
-if (-not (Test-Path $uvicornExe)) {
-    Fail "uvicorn not found at $uvicornExe. The backend virtualenv may be missing. Run: cd backend; python -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.txt"
+# When invoked from a portable build (RUN.bat passes -PythonExe), we run
+# 'python -m uvicorn' via the embedded interpreter. The dev launcher uses
+# the venv's uvicorn.exe shim as before.
+if ($PythonExe) {
+    if (-not (Test-Path $PythonExe)) {
+        Fail "Embedded Python not found at $PythonExe. The portable install may be corrupt — try reinstalling."
+    }
+    $uvicornCmd = $PythonExe
+    $uvicornArgs = @("-m", "uvicorn", "app.main:app", "--port", "8000")
+}
+else {
+    $uvicornExe = Join-Path $root "backend\.venv\Scripts\uvicorn.exe"
+    if (-not (Test-Path $uvicornExe)) {
+        Fail "uvicorn not found at $uvicornExe. The backend virtualenv may be missing. Run: cd backend; python -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.txt"
+    }
+    $uvicornCmd = $uvicornExe
+    $uvicornArgs = @("app.main:app", "--port", "8000")
 }
 
 # Truncate previous uvicorn logs so the tail-on-failure only reflects this run.
 "" | Out-File -FilePath $uvOutLog -Encoding utf8
 "" | Out-File -FilePath $uvErrLog -Encoding utf8
 
-$uv = Start-Process -FilePath $uvicornExe `
-    -ArgumentList "app.main:app","--port","8000" `
-    -WorkingDirectory (Join-Path $root "backend") `
+$uv = Start-Process -FilePath $uvicornCmd `
+    -ArgumentList $uvicornArgs `
+    -WorkingDirectory $BackendDir `
     -WindowStyle Hidden `
     -RedirectStandardOutput $uvOutLog `
     -RedirectStandardError $uvErrLog `
