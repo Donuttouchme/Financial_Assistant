@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import {
   useCategories,
   useCreateCategory,
 } from "@/hooks/queries/useCategories";
+import { useSettings } from "@/hooks/queries/useSettings";
 import { previewCsv, commitImport } from "@/api/csv-import";
 import type {
   CsvImportConfig,
@@ -37,12 +38,20 @@ const DEFAULT_CONFIG: CsvImportConfig = {
 export default function ImportPage() {
   const { data: categories } = useCategories();
   const createCategory = useCreateCategory();
+  const { data: settings } = useSettings();
 
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [config, setConfig] = useState<CsvImportConfig>(DEFAULT_CONFIG);
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
   const [selections, setSelections] = useState<ImportCommitRowSelection[]>([]);
   const [committing, setCommitting] = useState(false);
+  const [defaultCurrency, setDefaultCurrency] = useState<string>("CHF");
+
+  useEffect(() => {
+    if (settings?.base_currency) {
+      setDefaultCurrency(settings.base_currency);
+    }
+  }, [settings?.base_currency]);
 
   async function handleFile(f: File) {
     const text = await f.text();
@@ -63,7 +72,10 @@ export default function ImportPage() {
   async function handlePreview() {
     if (!fileContent) return;
     try {
-      const r = await previewCsv(fileContent, config);
+      const r = await previewCsv(fileContent, {
+        ...config,
+        default_currency: defaultCurrency,
+      });
       setRows(r.rows);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Preview failed";
@@ -76,7 +88,12 @@ export default function ImportPage() {
     setCommitting(true);
     try {
       await ensureImportedCategory();
-      const r = await commitImport(fileContent, config, selections);
+      const r = await commitImport(
+        fileContent,
+        { ...config, default_currency: defaultCurrency },
+        selections,
+        defaultCurrency,
+      );
       toast.success(`Imported ${r.imported}, skipped ${r.skipped}`);
       setRows(null);
       setFileContent(null);
@@ -125,7 +142,12 @@ export default function ImportPage() {
           <CardContent>
             <PresetSelector currentConfig={config} onLoad={setConfig} />
             <div className="my-3 border-t" />
-            <ImportConfigPanel config={config} onChange={setConfig} />
+            <ImportConfigPanel
+              config={config}
+              onChange={setConfig}
+              defaultCurrency={defaultCurrency}
+              onDefaultCurrencyChange={setDefaultCurrency}
+            />
             <div className="mt-4">
               <Button onClick={handlePreview}>Preview</Button>
             </div>

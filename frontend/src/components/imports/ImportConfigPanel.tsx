@@ -7,14 +7,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CurrencySelect } from "@/components/forms/CurrencySelect";
 import type { CsvImportConfig } from "@/api/types";
 
 interface Props {
   config: CsvImportConfig;
   onChange: (next: CsvImportConfig) => void;
+  defaultCurrency: string;
+  onDefaultCurrencyChange: (v: string) => void;
 }
 
-export function ImportConfigPanel({ config, onChange }: Props) {
+export function ImportConfigPanel({
+  config,
+  onChange,
+  defaultCurrency,
+  onDefaultCurrencyChange,
+}: Props) {
   function set<K extends keyof CsvImportConfig>(k: K, v: CsvImportConfig[K]) {
     onChange({ ...config, [k]: v });
   }
@@ -27,6 +35,16 @@ export function ImportConfigPanel({ config, onChange }: Props) {
 
   return (
     <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="cfg-default-currency">Default currency for this file</Label>
+        <CurrencySelect
+          id="cfg-default-currency"
+          aria-label="Default currency"
+          value={defaultCurrency}
+          onChange={onDefaultCurrencyChange}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="cfg-delim">Delimiter</Label>
@@ -156,6 +174,11 @@ export function ImportConfigPanel({ config, onChange }: Props) {
               />
             </>
           )}
+          <ColumnInputOptional
+            label="Currency col"
+            value={config.cols.currency ?? null}
+            onChange={(n) => setCol("currency", n)}
+          />
         </div>
       </div>
     </div>
@@ -179,6 +202,32 @@ function ColumnInput({
         min={0}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+      />
+    </div>
+  );
+}
+
+function ColumnInputOptional({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (n: number | null) => void;
+}) {
+  const id = `col-opt-${label.toLowerCase().replace(/\s+/g, "-")}`;
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={id} className="text-xs text-muted-foreground">{label}</Label>
+      <Input
+        id={id}
+        type="number"
+        min={0}
+        value={value ?? ""}
+        onChange={(e) =>
+          onChange(e.target.value === "" ? null : Number(e.target.value))
+        }
       />
     </div>
   );

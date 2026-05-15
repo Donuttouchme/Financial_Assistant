@@ -18,7 +18,14 @@ const defaultConfig: CsvImportConfig = {
 describe("ImportConfigPanel", () => {
   it("calls onChange when delimiter changes", () => {
     const onChange = vi.fn();
-    render(<ImportConfigPanel config={defaultConfig} onChange={onChange} />);
+    render(
+      <ImportConfigPanel
+        config={defaultConfig}
+        onChange={onChange}
+        defaultCurrency="CHF"
+        onDefaultCurrencyChange={vi.fn()}
+      />,
+    );
     fireEvent.click(screen.getByLabelText(/delimiter/i));
     fireEvent.click(screen.getByRole("option", { name: "," }));
     expect(onChange).toHaveBeenCalled();

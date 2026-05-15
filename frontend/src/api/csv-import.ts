@@ -20,9 +20,15 @@ export function commitImport(
   fileContent: string,
   config: CsvImportConfig,
   selections: ImportCommitRowSelection[],
+  defaultCurrency?: string,
 ): Promise<ImportCommitResponse> {
   return apiFetch<ImportCommitResponse>("/api/import/commit", {
     method: "POST",
-    body: JSON.stringify({ file_content: fileContent, config, selections }),
+    body: JSON.stringify({
+      file_content: fileContent,
+      config,
+      selections,
+      default_currency: defaultCurrency ?? null,
+    }),
   });
 }
