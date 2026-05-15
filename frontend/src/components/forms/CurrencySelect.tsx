@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { CURRENCY_SYMBOLS } from "@/lib/money";
 import { MOST_USED, SUPPORTED_CURRENCIES } from "@/lib/currencies";
 
@@ -16,6 +15,10 @@ const CURRENCY_NAMES: Record<string, string> = {
   ZAR: "South African Rand",
 };
 
+const OTHER_CURRENCIES = [...SUPPORTED_CURRENCIES]
+  .filter((c) => !(MOST_USED as readonly string[]).includes(c))
+  .sort((a, b) => a.localeCompare(b));
+
 interface Props {
   value: string;
   onChange: (value: string) => void;
@@ -32,14 +35,6 @@ function row(code: string): string {
 }
 
 export function CurrencySelect({ value, onChange, id, disabled, className, ...rest }: Props) {
-  const others = useMemo(
-    () =>
-      [...SUPPORTED_CURRENCIES]
-        .filter((c) => !(MOST_USED as readonly string[]).includes(c))
-        .sort((a, b) => a.localeCompare(b)),
-    [],
-  );
-
   return (
     <select
       id={id}
@@ -60,7 +55,7 @@ export function CurrencySelect({ value, onChange, id, disabled, className, ...re
         ))}
       </optgroup>
       <optgroup label="All currencies">
-        {others.map((code) => (
+        {OTHER_CURRENCIES.map((code) => (
           <option key={code} value={code}>
             {row(code)}
           </option>

@@ -127,6 +127,12 @@ export function TransactionFormDialog(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isEdit, isEdit ? props.transaction.id : null, baseCurrency]);
 
+  useEffect(() => {
+    if (!savedFlash) return;
+    const timer = window.setTimeout(() => setSavedFlash(false), 2000);
+    return () => clearTimeout(timer);
+  }, [savedFlash]);
+
   const selectedCategoryId = form.watch("category_id");
   const selectedCategory = (categories ?? []).find((c) => c.id === selectedCategoryId);
   const isSavings = selectedCategory?.kind === "savings";
@@ -162,7 +168,6 @@ export function TransactionFormDialog(props: Props) {
         form.setValue("description", "");
         form.setFocus("amount");
         setSavedFlash(true);
-        window.setTimeout(() => setSavedFlash(false), 2000);
       }
     } catch {
       // toast already fired by reportError

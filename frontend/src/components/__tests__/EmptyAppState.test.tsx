@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import { EmptyAppState } from "@/components/EmptyAppState";
 import { resetTestState, testState } from "@/tests/handlers";
 
@@ -10,7 +10,7 @@ function wrap(children: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return (
     <QueryClientProvider client={qc}>
-      <BrowserRouter>{children}</BrowserRouter>
+      <MemoryRouter>{children}</MemoryRouter>
     </QueryClientProvider>
   );
 }
