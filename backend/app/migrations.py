@@ -15,6 +15,8 @@ from sqlalchemy import Engine
 _COLUMN_ADDS: list[tuple[str, str, str]] = [
     ("categories", "target_amount", "NUMERIC(12,2)"),
     ("categories", "target_date", "DATE"),
+    ("transactions", "currency", "TEXT NOT NULL DEFAULT 'CHF'"),
+    ("recurring_schedules", "currency", "TEXT NOT NULL DEFAULT 'CHF'"),
 ]
 
 

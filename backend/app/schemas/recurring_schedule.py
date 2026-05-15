@@ -1,7 +1,7 @@
 from datetime import date as date_type
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RecurringScheduleRead(BaseModel):
@@ -12,6 +12,7 @@ class RecurringScheduleRead(BaseModel):
     amount: Decimal
     category_id: int
     description: str
+    currency: str
     start_date: date_type
     next_occurrence_date: date_type
     frequency: str

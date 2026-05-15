@@ -18,6 +18,9 @@ class Transaction(Base):
         ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     description: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, default="CHF", server_default="CHF"
+    )
     is_recurring: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

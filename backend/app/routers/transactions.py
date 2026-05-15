@@ -24,6 +24,7 @@ def create_transaction(
             category_id=payload.category_id,
             description=payload.description,
             is_recurring=payload.is_recurring,
+            currency=payload.currency,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -59,6 +60,7 @@ def update_transaction(
             tx_date=payload.date,
             category_id=payload.category_id,
             description=payload.description,
+            currency=payload.currency,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

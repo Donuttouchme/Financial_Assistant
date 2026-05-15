@@ -10,6 +10,7 @@ class TransactionCreate(BaseModel):
     category_id: int
     description: str = Field(default="", max_length=255)
     is_recurring: bool = False
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
 
 
 class TransactionUpdate(BaseModel):
@@ -17,6 +18,7 @@ class TransactionUpdate(BaseModel):
     date: date_type | None = None
     category_id: int | None = None
     description: str | None = Field(default=None, max_length=255)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
 
 
 class TransactionRead(BaseModel):
@@ -28,5 +30,7 @@ class TransactionRead(BaseModel):
     category_id: int
     description: str
     is_recurring: bool
+    currency: str
+    base_amount: Decimal | None = None
     created_at: datetime
     updated_at: datetime

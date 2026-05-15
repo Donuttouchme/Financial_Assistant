@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.models.category import Category
 from app.models.transaction import Transaction
+from app.services.currencies import SUPPORTED_CURRENCIES
+from app.services import settings_service
 
 
 def _month_bounds(month: str) -> tuple[date, date]:
@@ -41,6 +43,7 @@ def create_transaction(
     category_id: int,
     description: str,
     is_recurring: bool = False,
+    currency: str | None = None,
 ) -> Transaction:
     cat = _ensure_category(db, user_id=user_id, category_id=category_id)
     if cat.kind == "savings":
@@ -50,6 +53,12 @@ def create_transaction(
         if amount <= Decimal("0"):
             raise ValueError("amount must be > 0")
 
+    if currency is None:
+        currency = settings_service.get_settings(db).base_currency
+    code = currency.upper()
+    if code not in SUPPORTED_CURRENCIES:
+        raise ValueError(f"unknown currency: {currency!r}")
+
     tx = Transaction(
         user_id=user_id,
         amount=_quantize_money(amount),
@@ -57,6 +66,7 @@ def create_transaction(
         category_id=category_id,
         description=description,
         is_recurring=is_recurring,
+        currency=code,
     )
     db.add(tx)
     db.commit()
@@ -104,6 +114,7 @@ def update_transaction(
     tx_date: date | None = None,
     category_id: int | None = None,
     description: str | None = None,
+    currency: str | None = None,
 ) -> Transaction:
     tx = get_transaction(db, user_id=user_id, transaction_id=transaction_id)
     if tx is None:
@@ -132,6 +143,11 @@ def update_transaction(
         tx.category_id = category_id
     if description is not None:
         tx.description = description
+    if currency is not None:
+        code = currency.upper()
+        if code not in SUPPORTED_CURRENCIES:
+            raise ValueError(f"unknown currency: {currency!r}")
+        tx.currency = code
 
     db.commit()
     db.refresh(tx)

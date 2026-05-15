@@ -15,6 +15,7 @@ def create_schedule_for_transaction(db: Session, *, transaction: Transaction) ->
         amount=transaction.amount,
         category_id=transaction.category_id,
         description=transaction.description,
+        currency=transaction.currency,
         start_date=transaction.date,
         next_occurrence_date=transaction.date + relativedelta(months=1),
         frequency="monthly",
@@ -51,6 +52,7 @@ def run_due_schedules(db: Session, *, today: date) -> list[Transaction]:
                 category_id=sched.category_id,
                 description=sched.description,
                 is_recurring=False,
+                currency=sched.currency,
             )
             db.add(new_tx)
             created.append(new_tx)
