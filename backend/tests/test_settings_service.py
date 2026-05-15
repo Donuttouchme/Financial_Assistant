@@ -24,3 +24,9 @@ def test_set_base_currency_valid(db_session):
 def test_set_base_currency_rejects_unknown(db_session):
     with pytest.raises(ValueError, match="unknown currency"):
         settings_service.set_base_currency(db_session, "XYZ")
+
+
+def test_set_base_currency_normalizes_lowercase(db_session):
+    settings_service.set_base_currency(db_session, "huf")
+    s = settings_service.get_settings(db_session)
+    assert s.base_currency == "HUF"
