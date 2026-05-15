@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { CurrencySection } from "@/components/settings/CurrencySection";
 
 export default function SettingsPage() {
   return (
@@ -10,7 +11,7 @@ export default function SettingsPage() {
           <h3 className="text-2xl font-semibold leading-none tracking-tight">Currency</h3>
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground">Currency section.</div>
+          <CurrencySection />
         </CardContent>
       </Card>
 
