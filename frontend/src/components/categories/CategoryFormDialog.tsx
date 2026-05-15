@@ -11,7 +11,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useCreateCategory } from "@/hooks/queries/useCategories";
-import { parseChfInput } from "@/lib/currency";
+import { parseMoneyInput } from "@/lib/money";
+import { useSettings } from "@/hooks/queries/useSettings";
 
 const schema = z
   .object({
@@ -33,7 +34,7 @@ const schema = z
     }
     if (v.target_amount) {
       try {
-        const n = Number(parseChfInput(v.target_amount));
+        const n = Number(parseMoneyInput(v.target_amount));
         if (!(n > 0)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -66,6 +67,8 @@ interface Props {
 
 export function CategoryFormDialog({ open, onOpenChange }: Props) {
   const create = useCreateCategory();
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.base_currency ?? "CHF";
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { name: "", kind: "expense", target_amount: "", target_date: "" },
@@ -80,7 +83,7 @@ export function CategoryFormDialog({ open, onOpenChange }: Props) {
         kind: values.kind,
         target_amount:
           values.kind === "savings" && values.target_amount
-            ? parseChfInput(values.target_amount)
+            ? parseMoneyInput(values.target_amount)
             : null,
         target_date:
           values.kind === "savings" && values.target_date
@@ -147,7 +150,7 @@ export function CategoryFormDialog({ open, onOpenChange }: Props) {
           {kind === "savings" && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="cat-target-amount">Target amount (CHF, optional)</Label>
+                <Label htmlFor="cat-target-amount">Target amount ({baseCurrency}, optional)</Label>
                 <Input
                   id="cat-target-amount"
                   placeholder="0.00"

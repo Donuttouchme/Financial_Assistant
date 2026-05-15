@@ -1,15 +1,52 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import { EmptyAppState } from "../EmptyAppState";
+import { describe, expect, it, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter } from "react-router-dom";
+import { EmptyAppState } from "@/components/EmptyAppState";
+import { resetTestState, testState } from "@/tests/handlers";
 
-function renderWithRouter(ui: React.ReactNode) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+function wrap(children: React.ReactNode) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return (
+    <QueryClientProvider client={qc}>
+      <BrowserRouter>{children}</BrowserRouter>
+    </QueryClientProvider>
+  );
 }
 
-describe("EmptyAppState", () => {
-  it("shows the welcome message and a CTA link to /categories", () => {
-    renderWithRouter(<EmptyAppState />);
+beforeEach(() => resetTestState());
+
+describe("EmptyAppState — currency picker", () => {
+  it("shows currency dropdown defaulting to base", async () => {
+    render(wrap(<EmptyAppState />));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/default currency/i)).toHaveValue("CHF");
+    });
+  });
+
+  it("saving updates base currency", async () => {
+    const user = userEvent.setup();
+    render(wrap(<EmptyAppState />));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/default currency/i)).toBeInTheDocument();
+    });
+    await user.selectOptions(screen.getByLabelText(/default currency/i), "HUF");
+    await user.click(screen.getByRole("button", { name: /save currency/i }));
+    await waitFor(() => {
+      expect(testState.settings.base_currency).toBe("HUF");
+    });
+  });
+
+  it("still shows the Create first category CTA", () => {
+    render(wrap(<EmptyAppState />));
+    expect(screen.getByRole("link", { name: /create your first category/i })).toBeInTheDocument();
+  });
+});
+
+describe("EmptyAppState — welcome message", () => {
+  it("shows the welcome message and a CTA link to /categories", async () => {
+    render(wrap(<EmptyAppState />));
     expect(screen.getByText(/welcome to financial assistant/i)).toBeInTheDocument();
     const cta = screen.getByRole("link", { name: /create your first category/i });
     expect(cta).toHaveAttribute("href", "/categories");
