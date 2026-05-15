@@ -31,8 +31,11 @@ def _parse_response(payload: dict) -> dict[str, Decimal]:
 async def fetch_rates_for_date(target: date) -> dict[str, Decimal]:
     iso = target.isoformat()
     url = f"{FRANKFURTER_BASE_URL}/{iso}"
-    async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
-        response = await client.get(url)
+    try:
+        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
+            response = await client.get(url)
+    except httpx.HTTPError as exc:
+        raise FxFetchError(f"frankfurter.app request failed for {iso}: {exc}") from exc
     if response.status_code != 200:
         raise FxFetchError(
             f"frankfurter.app returned {response.status_code} for {iso}: {response.text[:200]}"
@@ -42,8 +45,11 @@ async def fetch_rates_for_date(target: date) -> dict[str, Decimal]:
 
 async def fetch_rates_for_today() -> dict[str, Decimal]:
     url = f"{FRANKFURTER_BASE_URL}/latest"
-    async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
-        response = await client.get(url)
+    try:
+        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
+            response = await client.get(url)
+    except httpx.HTTPError as exc:
+        raise FxFetchError(f"frankfurter.app request failed for latest: {exc}") from exc
     if response.status_code != 200:
         raise FxFetchError(
             f"frankfurter.app returned {response.status_code} for latest: {response.text[:200]}"

@@ -57,3 +57,14 @@ async def test_fetch_rates_for_today_uses_latest_endpoint(monkeypatch):
 
     await fx_service.fetch_rates_for_today()
     assert captured["url"].endswith("/latest")
+
+
+@pytest.mark.asyncio
+async def test_fetch_rates_wraps_network_error(monkeypatch):
+    async def fake_get(self, url, *args, **kwargs):
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+
+    with pytest.raises(fx_service.FxFetchError):
+        await fx_service.fetch_rates_for_date(date(2026, 5, 14))
