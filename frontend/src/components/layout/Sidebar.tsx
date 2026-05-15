@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import {
-  LayoutDashboard, Receipt, Tag, Wallet, Download, Upload,
+  LayoutDashboard, Receipt, Tag, Wallet, Download, Upload, Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ const links = [
   { to: "/budgets", label: "Budgets", icon: Wallet },
   { to: "/import", label: "Import", icon: Upload },
   { to: "/export", label: "Export", icon: Download },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
