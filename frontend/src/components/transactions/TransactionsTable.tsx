@@ -16,7 +16,8 @@ import {
   useTransactions, useDeleteTransaction,
 } from "@/hooks/queries/useTransactions";
 import { useCategories } from "@/hooks/queries/useCategories";
-import { formatChf } from "@/lib/currency";
+import { useSettings } from "@/hooks/queries/useSettings";
+import { formatMoney } from "@/lib/money";
 import type { Transaction } from "@/api/types";
 
 interface Props {
@@ -30,6 +31,8 @@ export function TransactionsTable({ month, categoryId }: Props) {
     category_id: categoryId,
   });
   const { data: cats } = useCategories();
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.base_currency ?? "CHF";
   const del = useDeleteTransaction();
 
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -82,7 +85,19 @@ export function TransactionsTable({ month, categoryId }: Props) {
                 {t.description || <span className="italic">—</span>}
               </TableCell>
               <TableCell className="text-right tabular-nums">
-                {formatChf(t.amount)}
+                <div>{formatMoney(t.amount, t.currency)}</div>
+                {t.currency !== baseCurrency && (
+                  <div
+                    className="text-xs text-muted-foreground"
+                    title={
+                      t.base_amount === null
+                        ? "FX rate unavailable — refresh rates in Settings"
+                        : ""
+                    }
+                  >
+                    ≈ {t.base_amount === null ? "—" : formatMoney(t.base_amount, baseCurrency)}
+                  </div>
+                )}
               </TableCell>
               <TableCell className="text-right">
                 <Button
