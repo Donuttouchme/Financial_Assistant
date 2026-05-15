@@ -47,6 +47,8 @@ describe("TransactionFormDialog", () => {
             category_id: 1,
             description: "Milk",
             is_recurring: false,
+            currency: "CHF",
+            base_amount: null,
             created_at: "",
             updated_at: "",
           }}
@@ -123,6 +125,8 @@ describe("TransactionFormDialog savings flow", () => {
             category_id: 99,
             description: "Withdrawal",
             is_recurring: false,
+            currency: "CHF",
+            base_amount: null,
             created_at: "",
             updated_at: "",
           }}

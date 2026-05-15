@@ -33,8 +33,8 @@ describe("CategoryDonut legend", () => {
       { id: 2, name: "Eating-out", kind: "expense", target_amount: null, target_date: null, created_at: "2026-05-01T00:00:00" },
     ];
     testState.transactions = [
-      { id: 1, user_id: 1, amount: "75", description: "", date: "2026-05-10", category_id: 1, is_recurring: false, created_at: "", updated_at: "" },
-      { id: 2, user_id: 1, amount: "25", description: "", date: "2026-05-11", category_id: 2, is_recurring: false, created_at: "", updated_at: "" },
+      { id: 1, user_id: 1, amount: "75", description: "", date: "2026-05-10", category_id: 1, is_recurring: false, currency: "CHF", base_amount: null, created_at: "", updated_at: "" },
+      { id: 2, user_id: 1, amount: "25", description: "", date: "2026-05-11", category_id: 2, is_recurring: false, currency: "CHF", base_amount: null, created_at: "", updated_at: "" },
     ];
   });
 

@@ -93,6 +93,7 @@ export const handlers = [
       amount: string; date: string; category_id: number;
       description: string; is_recurring?: boolean;
     };
+    const bodyAny = body as { currency?: string };
     const tx: Transaction = {
       id: testState.nextTxId++,
       user_id: 1,
@@ -101,6 +102,8 @@ export const handlers = [
       category_id: body.category_id,
       description: body.description,
       is_recurring: body.is_recurring ?? false,
+      currency: bodyAny.currency ?? "CHF",
+      base_amount: body.amount,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
