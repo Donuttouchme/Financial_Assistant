@@ -2,6 +2,19 @@ def _seed_category(client, name="Imported", kind="expense"):
     return client.post("/api/categories", json={"name": name, "kind": kind}).json()
 
 
+_BASE_CONFIG = {
+    "delimiter": ";",
+    "decimal_sep": ".",
+    "thousands_sep": "",
+    "date_format": "%Y-%m-%d",
+    "skip_header_rows": 0,
+    "has_header": False,
+    "amount_format": "signed",
+    "sign_convention": "negative_is_expense",
+    "cols": {"date": 0, "description": 1, "amount": 2},
+}
+
+
 def test_preview_returns_parsed_rows(client):
     payload = {
         "file_content": "2026-05-13;COOP;-45.30\n2026-05-13;Salary;5200\n",
@@ -83,3 +96,67 @@ def test_commit_creates_only_selected_rows(client):
 
     txs = client.get("/api/transactions?month=2026-05").json()
     assert len(txs) == 1
+
+
+def test_commit_with_default_currency(client):
+    """Rows without a currency column inherit the file's default_currency."""
+    cat = _seed_category(client, kind="income")
+    payload = {
+        "file_content": "2026-05-14;salary;5000\n",
+        "config": {**_BASE_CONFIG},
+        "selections": [
+            {"row_index": 0, "category_id": cat["id"], "is_recurring": False},
+        ],
+        "default_currency": "EUR",
+    }
+    r = client.post("/api/import/commit", json=payload)
+    assert r.status_code == 200
+    assert r.json() == {"imported": 1, "skipped": 0}
+
+    txs = client.get("/api/transactions?month=2026-05").json()
+    assert len(txs) == 1
+    assert txs[0]["currency"] == "EUR"
+
+
+def test_commit_with_per_row_currency_column(client):
+    """When a currency column is mapped, each row's currency overrides the default."""
+    cat = _seed_category(client, kind="income")
+    # CSV: date;desc;amount;currency  (col 3 = currency)
+    payload = {
+        "file_content": "2026-05-14;bonus;20.00;USD\n2026-05-14;gift;3.50;GBP\n",
+        "config": {
+            **_BASE_CONFIG,
+            "cols": {"date": 0, "description": 1, "amount": 2, "currency": 3},
+        },
+        "selections": [
+            {"row_index": 0, "category_id": cat["id"], "is_recurring": False},
+            {"row_index": 1, "category_id": cat["id"], "is_recurring": False},
+        ],
+        "default_currency": "EUR",
+    }
+    r = client.post("/api/import/commit", json=payload)
+    assert r.status_code == 200
+    assert r.json() == {"imported": 2, "skipped": 0}
+
+    txs = client.get("/api/transactions?month=2026-05").json()
+    assert len(txs) == 2
+    currencies = {tx["currency"] for tx in txs}
+    assert currencies == {"USD", "GBP"}
+
+
+def test_commit_with_config_default_currency(client):
+    """default_currency on the config object is used as fallback when not set on the commit request."""
+    cat = _seed_category(client, kind="income")
+    payload = {
+        "file_content": "2026-05-14;dividends;100\n",
+        "config": {**_BASE_CONFIG, "default_currency": "CHF"},
+        "selections": [
+            {"row_index": 0, "category_id": cat["id"], "is_recurring": False},
+        ],
+    }
+    r = client.post("/api/import/commit", json=payload)
+    assert r.status_code == 200
+
+    txs = client.get("/api/transactions?month=2026-05").json()
+    assert len(txs) == 1
+    assert txs[0]["currency"] == "CHF"
