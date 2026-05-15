@@ -78,3 +78,43 @@ def test_put_budget_on_income_category_returns_400(client):
     )
     assert response.status_code == 400
     assert "expense" in response.json()["detail"].lower()
+
+
+def test_spent_aggregates_in_base_currency(client, db_session):
+    from datetime import date
+    from decimal import Decimal
+    from app.models.category import Category
+    from app.models.transaction import Transaction
+    from app.models.budget_limit import BudgetLimit
+    from app.models.fx_rate import FxRate
+    from app.services import settings_service
+
+    settings_service.set_base_currency(db_session, "CHF")
+    cat = Category(user_id=1, name="Food", kind="expense")
+    db_session.add(cat)
+    db_session.flush()
+    db_session.add(
+        BudgetLimit(user_id=1, category_id=cat.id, month="2026-05", monthly_limit=Decimal("200"))
+    )
+    # 100 CHF + 50 EUR (where 1 EUR = 1/0.96 CHF ≈ 1.0417 CHF, 50 EUR ≈ 52.08 CHF) = ~152.08 CHF
+    db_session.add(Transaction(
+        user_id=1, amount=Decimal("100"), date=date(2026, 5, 10),
+        category_id=cat.id, description="x", currency="CHF",
+    ))
+    db_session.add(Transaction(
+        user_id=1, amount=Decimal("50"), date=date(2026, 5, 11),
+        category_id=cat.id, description="y", currency="EUR",
+    ))
+    db_session.add(FxRate(currency="EUR", date=date(2026, 5, 10), rate_to_eur=Decimal("1.0")))
+    db_session.add(FxRate(currency="CHF", date=date(2026, 5, 10), rate_to_eur=Decimal("0.96")))
+    db_session.add(FxRate(currency="EUR", date=date(2026, 5, 11), rate_to_eur=Decimal("1.0")))
+    db_session.add(FxRate(currency="CHF", date=date(2026, 5, 11), rate_to_eur=Decimal("0.96")))
+    db_session.commit()
+
+    resp = client.get("/api/budgets?month=2026-05")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    spent = Decimal(body[0]["spent"]).quantize(Decimal("0.01"))
+    # 100 CHF + 50 EUR converted: 100 + (50 * 1.0 / 0.96) = 100 + 52.0833... = 152.08
+    assert spent == Decimal("152.08")

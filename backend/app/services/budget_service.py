@@ -76,13 +76,52 @@ def _month_bounds(month: str):
 def list_budgets_with_spending(
     db: Session, *, user_id: int, month: str
 ) -> list[BudgetWithSpendingRow]:
+    from sqlalchemy import case
+    from app.models.fx_rate import FxRate
+    from app.services import settings_service
+
     _validate_month(month)
     start, end = _month_bounds(month)
+    base_currency = settings_service.get_settings(db).base_currency
+
+    fx_native = FxRate.__table__.alias("fx_native")
+    fx_base = FxRate.__table__.alias("fx_base")
+
+    # EUR is the pivot — treat as 1.0 even when no row exists.
+    def _rate_expr(alias, currency_col):
+        return case(
+            (currency_col == "EUR", Decimal("1.0")),
+            else_=alias.c.rate_to_eur,
+        )
+
+    base_amount_expr = case(
+        (Transaction.currency == base_currency, Transaction.amount),
+        (
+            (_rate_expr(fx_native, Transaction.currency).is_(None))
+            | (_rate_expr(fx_base, base_currency).is_(None)),
+            None,
+        ),
+        else_=Transaction.amount
+        * _rate_expr(fx_native, Transaction.currency)
+        / _rate_expr(fx_base, base_currency),
+    )
 
     spent_subq = (
         select(
             Transaction.category_id.label("category_id"),
-            func.coalesce(func.sum(Transaction.amount), 0).label("spent"),
+            func.coalesce(func.sum(base_amount_expr), 0).label("spent"),
+        )
+        .select_from(Transaction)
+        .join(
+            fx_native,
+            (fx_native.c.currency == Transaction.currency)
+            & (fx_native.c.date == Transaction.date),
+            isouter=True,
+        )
+        .join(
+            fx_base,
+            (fx_base.c.currency == base_currency) & (fx_base.c.date == Transaction.date),
+            isouter=True,
         )
         .where(
             Transaction.user_id == user_id,
@@ -103,7 +142,7 @@ def list_budgets_with_spending(
     two = Decimal("0.01")
     result: list[BudgetWithSpendingRow] = []
     for budget, cat_name, spent in rows:
-        spent_dec = (Decimal(spent) if spent is not None else Decimal("0")).quantize(two)
+        spent_dec = (Decimal(str(spent)) if spent is not None else Decimal("0")).quantize(two)
         limit = budget.monthly_limit.quantize(two)
         overage = (spent_dec - limit).quantize(two) if spent_dec > limit else Decimal("0.00")
         result.append(
