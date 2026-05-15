@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/chart";
 import { useTransactions } from "@/hooks/queries/useTransactions";
 import { useCategories } from "@/hooks/queries/useCategories";
-import { formatChf } from "@/lib/currency";
+import { formatMoney } from "@/lib/money";
+import { useSettings } from "@/hooks/queries/useSettings";
 
 interface Props { month: string }
 
@@ -29,6 +30,8 @@ const PALETTE = [
 export function CategoryDonut({ month }: Props) {
   const { data: txs, isLoading: txsLoading } = useTransactions({ month });
   const { data: cats, isLoading: catsLoading } = useCategories();
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.base_currency ?? "CHF";
 
   const slices: Slice[] = useMemo(() => {
     if (!txs || !cats) return [];
@@ -38,7 +41,8 @@ export function CategoryDonut({ month }: Props) {
     const totals = new Map<number, number>();
     for (const t of txs) {
       if (!expense.has(t.category_id)) continue;
-      totals.set(t.category_id, (totals.get(t.category_id) ?? 0) + Number(t.amount));
+      if (t.base_amount === null) continue;
+      totals.set(t.category_id, (totals.get(t.category_id) ?? 0) + Number(t.base_amount));
     }
     return [...totals.entries()]
       .sort(([, a], [, b]) => b - a)
@@ -83,7 +87,7 @@ export function CategoryDonut({ month }: Props) {
                         const v = Number(value);
                         const pct = total > 0 ? (v / total) * 100 : 0;
                         return [
-                          `${formatChf(v)} (${pct.toFixed(0)}%)`,
+                          `${formatMoney(v, baseCurrency)} (${pct.toFixed(0)}%)`,
                           item.payload.category,
                         ];
                       }}

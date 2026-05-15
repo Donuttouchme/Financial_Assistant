@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBudgetsForMonth } from "@/hooks/queries/useBudgets";
-import { formatChf } from "@/lib/currency";
+import { formatMoney } from "@/lib/money";
+import { useSettings } from "@/hooks/queries/useSettings";
 import { monthLabel } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,8 @@ function progressColor(pct: number): string {
 
 export function BudgetWidget({ month }: Props) {
   const { data, isLoading } = useBudgetsForMonth(month);
+  const { data: settings } = useSettings();
+  const baseCurrency = settings?.base_currency ?? "CHF";
 
   const rows = useMemo(() => {
     return (data ?? [])
@@ -69,10 +72,10 @@ export function BudgetWidget({ month }: Props) {
             <div className="space-y-1">
               <div className="flex items-baseline gap-2">
                 <span className="text-lg font-semibold tabular-nums">
-                  {formatChf(totals.spent)}
+                  {formatMoney(totals.spent, baseCurrency)}
                 </span>
                 <span className="text-muted-foreground text-sm">
-                  / {formatChf(totals.limit)}
+                  / {formatMoney(totals.limit, baseCurrency)}
                 </span>
                 <span
                   className={cn("ml-auto text-sm font-medium", toneFor(totalPct))}
@@ -85,7 +88,7 @@ export function BudgetWidget({ month }: Props) {
                 indicatorClassName={progressColor(totalPct)}
               />
               <div className="text-xs text-muted-foreground">
-                {formatChf(Math.max(0, totals.limit - totals.spent))} remaining
+                {formatMoney(Math.max(0, totals.limit - totals.spent), baseCurrency)} remaining
               </div>
             </div>
 
@@ -103,8 +106,8 @@ export function BudgetWidget({ month }: Props) {
                     />
                   </div>
                   <div className="w-32 text-right tabular-nums text-sm">
-                    {formatChf(r.spent)}
-                    <span className="text-muted-foreground"> / {formatChf(r.limit)}</span>
+                    {formatMoney(r.spent, baseCurrency)}
+                    <span className="text-muted-foreground"> / {formatMoney(r.limit, baseCurrency)}</span>
                   </div>
                   <div
                     className={cn(
