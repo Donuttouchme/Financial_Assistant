@@ -7,6 +7,17 @@ from app.database import Base
 import app.models  # noqa: F401 — register models with Base.metadata
 
 
+@pytest.fixture(autouse=True)
+def _no_real_fx_refresh(monkeypatch):
+    """Prevent the lifespan's FX kickoff from hitting the real network in tests."""
+    from app.services import fx_service
+
+    async def noop(*args, **kwargs):
+        return (None, 0)
+
+    monkeypatch.setattr(fx_service, "refresh_today", noop)
+
+
 @pytest.fixture
 def db_session():
     engine = create_engine(
