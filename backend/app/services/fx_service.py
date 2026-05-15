@@ -9,8 +9,14 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import Iterable
 
 import httpx
+from sqlalchemy import func, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.orm import Session
+
+from app.models.fx_rate import FxRate
 
 FRANKFURTER_BASE_URL = "https://api.frankfurter.app"
 _HTTP_TIMEOUT_SECONDS = 8.0
@@ -55,3 +61,72 @@ async def fetch_rates_for_today() -> dict[str, Decimal]:
             f"frankfurter.app returned {response.status_code} for latest: {response.text[:200]}"
         )
     return _parse_response(response.json())
+
+
+def get_latest_date(db: Session) -> date | None:
+    return db.execute(select(func.max(FxRate.date))).scalar_one_or_none()
+
+
+def get_rate(db: Session, currency: str, when: date) -> Decimal | None:
+    """Return the rate row's value for (currency, when). EUR is always 1.0."""
+    if currency == "EUR":
+        return Decimal("1.0")
+    return db.execute(
+        select(FxRate.rate_to_eur).where(FxRate.currency == currency, FxRate.date == when)
+    ).scalar_one_or_none()
+
+
+def _has_any_row_for_date(db: Session, when: date) -> bool:
+    return db.execute(
+        select(FxRate.currency).where(FxRate.date == when).limit(1)
+    ).first() is not None
+
+
+def _upsert_rates(db: Session, when: date, rates: dict[str, Decimal]) -> int:
+    """Insert OR IGNORE per (currency, date). Returns number of upserted rows."""
+    rows = [
+        {"currency": code, "date": when, "rate_to_eur": rate}
+        for code, rate in rates.items()
+    ]
+    if not rows:
+        return 0
+    stmt = sqlite_insert(FxRate).values(rows)
+    # On conflict (currency, date), keep the existing row — first fetch wins.
+    stmt = stmt.on_conflict_do_nothing(index_elements=["currency", "date"])
+    result = db.execute(stmt)
+    db.commit()
+    return result.rowcount or 0
+
+
+async def ensure_rates_for_date(db: Session, when: date) -> None:
+    """Eager fill: if no rate rows exist for `when`, fetch from frankfurter and upsert.
+
+    Idempotent. Swallows FxFetchError so callers (transaction insert, CSV import,
+    etc.) don't fail when offline — the rates will be filled on next refresh.
+    """
+    if _has_any_row_for_date(db, when):
+        return
+    try:
+        rates = await fetch_rates_for_date(when)
+    except FxFetchError:
+        return
+    _upsert_rates(db, when, rates)
+
+
+async def refresh_today(db: Session) -> tuple[date | None, int]:
+    """Fetch /latest and upsert. Returns (fetched_date, currencies_updated).
+
+    Used by lifespan startup and by POST /api/fx/refresh.
+    """
+    try:
+        rates = await fetch_rates_for_today()
+    except FxFetchError:
+        return (None, 0)
+    when = date.today()
+    count = _upsert_rates(db, when, rates)
+    return (when, count)
+
+
+async def ensure_rates_for_dates(db: Session, dates: Iterable[date]) -> None:
+    for d in set(dates):
+        await ensure_rates_for_date(db, d)
