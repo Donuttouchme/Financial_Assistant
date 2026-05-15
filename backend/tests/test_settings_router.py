@@ -54,3 +54,45 @@ def test_preview_base_currency_lists_affected_budgets(client, db_session):
     assert budgets[0]["old_amount"] == "200.00"
     # 200 CHF * 0.96 EUR / 1.0 EUR = 192 EUR (approximately)
     assert Decimal(budgets[0]["new_amount"]).quantize(Decimal("0.01")) == Decimal("192.00")
+
+
+def test_preview_base_currency_returns_409_when_rates_missing(client, db_session):
+    from decimal import Decimal
+    from app.models.category import Category
+    from app.models.budget_limit import BudgetLimit
+
+    # Set up a budget but NO fx_rates rows. The preview must fail to convert.
+    cat = Category(user_id=1, name="Food", kind="expense")
+    db_session.add(cat)
+    db_session.flush()
+    db_session.add(
+        BudgetLimit(user_id=1, category_id=cat.id, month="2026-05", monthly_limit=Decimal("200"))
+    )
+    db_session.commit()
+
+    resp = client.post(
+        "/api/settings/base_currency/preview",
+        json={"base_currency": "EUR"},
+    )
+    assert resp.status_code == 409
+    assert "FX rate" in resp.json()["detail"]
+
+
+def test_commit_base_currency_returns_409_when_rates_missing(client, db_session):
+    from decimal import Decimal
+    from app.models.category import Category
+    from app.models.budget_limit import BudgetLimit
+
+    cat = Category(user_id=1, name="Food", kind="expense")
+    db_session.add(cat)
+    db_session.flush()
+    db_session.add(
+        BudgetLimit(user_id=1, category_id=cat.id, month="2026-05", monthly_limit=Decimal("200"))
+    )
+    db_session.commit()
+
+    resp = client.patch(
+        "/api/settings/base_currency",
+        json={"base_currency": "EUR"},
+    )
+    assert resp.status_code == 409
