@@ -1,9 +1,13 @@
 import { http, HttpResponse } from "msw";
 import type {
+  BaseCurrencyChangePreview,
   BudgetRead,
   BudgetWithSpending,
   Category,
+  FxRefreshResponse,
+  FxStatusRead,
   ImportPreset,
+  SettingsRead,
   Transaction,
 } from "@/api/types";
 
@@ -12,6 +16,8 @@ export const testState = {
   transactions: [] as Transaction[],
   budgets: [] as BudgetRead[],
   importPresets: [] as ImportPreset[],
+  settings: { base_currency: "CHF" } as SettingsRead,
+  fxStatus: { latest_date: null, source: "frankfurter.app", is_fresh: false } as FxStatusRead,
   nextCatId: 1,
   nextTxId: 1,
   nextPresetId: 1,
@@ -22,6 +28,8 @@ export function resetTestState() {
   testState.transactions = [];
   testState.budgets = [];
   testState.importPresets = [];
+  testState.settings = { base_currency: "CHF" };
+  testState.fxStatus = { latest_date: null, source: "frankfurter.app", is_fresh: false };
   testState.nextCatId = 1;
   testState.nextTxId = 1;
   testState.nextPresetId = 1;
@@ -203,5 +211,43 @@ export const handlers = [
     }
     testState.importPresets.splice(idx, 1);
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/settings", () => HttpResponse.json(testState.settings)),
+
+  http.patch("/api/settings/base_currency", async ({ request }) => {
+    const body = (await request.json()) as { base_currency: string };
+    testState.settings = { base_currency: body.base_currency };
+    return HttpResponse.json(testState.settings);
+  }),
+
+  http.post("/api/settings/base_currency/preview", async ({ request }) => {
+    const body = (await request.json()) as { base_currency: string };
+    const preview: BaseCurrencyChangePreview = {
+      old_base: testState.settings.base_currency,
+      new_base: body.base_currency,
+      budgets: testState.budgets.map((b) => ({
+        category_id: b.category_id,
+        category_name:
+          testState.categories.find((c) => c.id === b.category_id)?.name ?? `#${b.category_id}`,
+        month: b.month,
+        old_amount: b.monthly_limit,
+        new_amount: b.monthly_limit,
+      })),
+      savings_goals: [],
+    };
+    return HttpResponse.json(preview);
+  }),
+
+  http.get("/api/fx/status", () => HttpResponse.json(testState.fxStatus)),
+
+  http.post("/api/fx/refresh", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    testState.fxStatus = { latest_date: today, source: "frankfurter.app", is_fresh: true };
+    return HttpResponse.json<FxRefreshResponse>({
+      fetched_date: today,
+      currencies_updated: 31,
+      ok: true,
+    });
   }),
 ];
