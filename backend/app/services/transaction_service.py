@@ -8,7 +8,7 @@ from app.models.category import Category
 from app.models.fx_rate import FxRate
 from app.models.transaction import Transaction
 from app.services.currencies import SUPPORTED_CURRENCIES
-from app.services import settings_service
+from app.services import settings_service, fx_service
 
 
 def _month_bounds(month: str) -> tuple[date, date]:
@@ -239,3 +239,52 @@ def delete_transaction(db: Session, *, user_id: int, transaction_id: int) -> Non
         raise LookupError(f"Transaction {transaction_id} not found for user {user_id}")
     db.delete(tx)
     db.commit()
+
+
+async def create_transaction_async(
+    db: Session,
+    *,
+    user_id: int,
+    amount: Decimal,
+    tx_date: date,
+    category_id: int,
+    description: str,
+    is_recurring: bool = False,
+    currency: str | None = None,
+) -> Transaction:
+    await fx_service.ensure_rates_for_date(db, tx_date)
+    return create_transaction(
+        db,
+        user_id=user_id,
+        amount=amount,
+        tx_date=tx_date,
+        category_id=category_id,
+        description=description,
+        is_recurring=is_recurring,
+        currency=currency,
+    )
+
+
+async def update_transaction_async(
+    db: Session,
+    *,
+    user_id: int,
+    transaction_id: int,
+    amount: Decimal | None = None,
+    tx_date: date | None = None,
+    category_id: int | None = None,
+    description: str | None = None,
+    currency: str | None = None,
+) -> Transaction:
+    if tx_date is not None:
+        await fx_service.ensure_rates_for_date(db, tx_date)
+    return update_transaction(
+        db,
+        user_id=user_id,
+        transaction_id=transaction_id,
+        amount=amount,
+        tx_date=tx_date,
+        category_id=category_id,
+        description=description,
+        currency=currency,
+    )

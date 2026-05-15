@@ -329,3 +329,37 @@ def test_update_transaction_reparent_rejects_invalid_existing_amount(db_session)
         transaction_service.update_transaction(
             db_session, user_id=1, transaction_id=tx.id, category_id=expense_cat.id
         )
+
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_create_transaction_triggers_eager_fill(db_session, monkeypatch):
+    from datetime import date
+    from decimal import Decimal
+
+    from app.models.category import Category
+    from app.services import transaction_service, fx_service
+
+    called: list[date] = []
+
+    async def stub_ensure(db, when):
+        called.append(when)
+
+    monkeypatch.setattr(fx_service, "ensure_rates_for_date", stub_ensure)
+
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+
+    await transaction_service.create_transaction_async(
+        db_session,
+        user_id=1,
+        amount=Decimal("100"),
+        tx_date=date(2026, 5, 14),
+        category_id=cat.id,
+        description="x",
+        currency="EUR",
+    )
+    assert called == [date(2026, 5, 14)]

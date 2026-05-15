@@ -10,13 +10,13 @@ router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
-def create_transaction(
+async def create_transaction(
     payload: TransactionCreate,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     try:
-        tx = transaction_service.create_transaction(
+        tx = await transaction_service.create_transaction_async(
             db,
             user_id=user_id,
             amount=payload.amount,
@@ -47,14 +47,14 @@ def list_transactions(
 
 
 @router.put("/{transaction_id}", response_model=TransactionRead)
-def update_transaction(
+async def update_transaction(
     transaction_id: int,
     payload: TransactionUpdate,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     try:
-        tx = transaction_service.update_transaction(
+        tx = await transaction_service.update_transaction_async(
             db,
             user_id=user_id,
             transaction_id=transaction_id,
