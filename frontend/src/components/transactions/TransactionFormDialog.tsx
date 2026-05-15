@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { CheckCircle2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -13,12 +14,16 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { CurrencySelect } from "@/components/forms/CurrencySelect";
 import { useCategories } from "@/hooks/queries/useCategories";
 import {
   useCreateTransaction, useUpdateTransaction,
 } from "@/hooks/queries/useTransactions";
+import { useSettings } from "@/hooks/queries/useSettings";
+import { isSupportedCurrency } from "@/lib/currencies";
+import type { SupportedCurrency } from "@/lib/currencies";
+import { parseMoneyInput } from "@/lib/money";
 import type { Transaction } from "@/api/types";
-import { parseChfInput } from "@/lib/currency";
 
 const schema = z.object({
   amount: z
@@ -26,7 +31,7 @@ const schema = z.object({
     .min(1, "Required")
     .refine((s) => {
       try {
-        const n = Number(parseChfInput(s));
+        const n = Number(parseMoneyInput(s));
         return n > 0;
       } catch {
         return false;
@@ -37,6 +42,7 @@ const schema = z.object({
   description: z.string().max(255).default(""),
   is_recurring: z.boolean().default(false),
   direction: z.enum(["deposit", "withdraw"]).default("deposit"),
+  currency: z.string().refine(isSupportedCurrency, "Pick a supported currency"),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -63,8 +69,12 @@ export function TransactionFormDialog(props: Props) {
   const isEdit = props.mode === "edit";
 
   const { data: categories } = useCategories();
+  const { data: settings } = useSettings();
   const create = useCreateTransaction();
   const update = useUpdateTransaction();
+  const baseCurrency = (settings?.base_currency ?? "CHF") as SupportedCurrency;
+
+  const [savedFlash, setSavedFlash] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -76,6 +86,7 @@ export function TransactionFormDialog(props: Props) {
           description: props.transaction.description,
           is_recurring: props.transaction.is_recurring,
           direction: parseFloat(props.transaction.amount) < 0 ? "withdraw" : "deposit",
+          currency: props.transaction.currency as SupportedCurrency,
         }
       : {
           amount: "",
@@ -84,23 +95,22 @@ export function TransactionFormDialog(props: Props) {
           description: "",
           is_recurring: false,
           direction: "deposit",
+          currency: baseCurrency,
         },
   });
 
-  // When the dialog reopens (mostly in edit mode with a different transaction),
-  // re-seed the form with the current props.
   useEffect(() => {
     if (open) {
       if (isEdit) {
         const amt = parseFloat(props.transaction.amount);
-        const dir = amt < 0 ? "withdraw" : "deposit";
         form.reset({
           amount: String(Math.abs(amt)),
           date: props.transaction.date,
           category_id: props.transaction.category_id,
           description: props.transaction.description,
           is_recurring: props.transaction.is_recurring,
-          direction: dir,
+          direction: amt < 0 ? "withdraw" : "deposit",
+          currency: props.transaction.currency as SupportedCurrency,
         });
       } else {
         form.reset({
@@ -110,47 +120,64 @@ export function TransactionFormDialog(props: Props) {
           description: "",
           is_recurring: false,
           direction: "deposit",
+          currency: baseCurrency,
         });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isEdit, isEdit ? props.transaction.id : null]);
+  }, [open, isEdit, isEdit ? props.transaction.id : null, baseCurrency]);
 
   const selectedCategoryId = form.watch("category_id");
   const selectedCategory = (categories ?? []).find((c) => c.id === selectedCategoryId);
   const isSavings = selectedCategory?.kind === "savings";
   const direction = form.watch("direction") ?? "deposit";
 
-  function onSubmit(values: FormValues) {
-    let amount = parseChfInput(values.amount);
+  function payloadFromValues(values: FormValues) {
+    let amount = parseMoneyInput(values.amount);
     if (selectedCategory?.kind === "savings" && values.direction === "withdraw") {
-      // Always produce a single leading minus, regardless of existing prefix.
       amount = "-" + amount.replace(/^-/, "");
     }
+    return {
+      amount,
+      date: values.date,
+      category_id: values.category_id,
+      description: values.description,
+      is_recurring: values.is_recurring,
+      currency: values.currency,
+    };
+  }
+
+  async function onCreate(values: FormValues, closeAfter: boolean) {
+    if (isEdit) return;
+    try {
+      await create.mutateAsync({
+        payload: payloadFromValues(values),
+        silent: !closeAfter,
+      });
+      if (closeAfter) {
+        onOpenChange(false);
+      } else {
+        // Smart-retain: keep date, category, is_recurring, currency; clear amount + description.
+        form.setValue("amount", "");
+        form.setValue("description", "");
+        form.setFocus("amount");
+        setSavedFlash(true);
+        window.setTimeout(() => setSavedFlash(false), 2000);
+      }
+    } catch {
+      // toast already fired by reportError
+    }
+  }
+
+  function onSubmit(values: FormValues) {
     if (isEdit) {
+      const { is_recurring: _ignore, ...rest } = payloadFromValues(values);
       update.mutate(
-        {
-          id: props.transaction.id,
-          payload: {
-            amount,
-            date: values.date,
-            category_id: values.category_id,
-            description: values.description,
-          },
-        },
+        { id: props.transaction.id, payload: rest },
         { onSuccess: () => onOpenChange(false) },
       );
     } else {
-      create.mutate(
-        {
-          amount,
-          date: values.date,
-          category_id: values.category_id,
-          description: values.description,
-          is_recurring: values.is_recurring,
-        },
-        { onSuccess: () => onOpenChange(false) },
-      );
+      void onCreate(values, true);
     }
   }
 
@@ -160,7 +187,10 @@ export function TransactionFormDialog(props: Props) {
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o) form.reset();
+        if (!o) {
+          form.reset();
+          setSavedFlash(false);
+        }
         onOpenChange(o);
       }}
     >
@@ -170,13 +200,37 @@ export function TransactionFormDialog(props: Props) {
             <DialogTitle>{isEdit ? "Edit transaction" : "Add transaction"}</DialogTitle>
           </DialogHeader>
 
+          {savedFlash && (
+            <div
+              role="status"
+              className="flex items-center gap-2 rounded-md bg-emerald-100 dark:bg-emerald-900 px-3 py-2 text-sm"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Saved — enter the next one</span>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="tx-amount">Amount (CHF)</Label>
-            <Input id="tx-amount" placeholder="0.00" {...form.register("amount")} autoFocus />
+            <Label htmlFor="tx-amount">Amount</Label>
+            <div className="flex gap-2">
+              <Input
+                id="tx-amount"
+                placeholder="0.00"
+                {...form.register("amount")}
+                autoFocus
+                className="flex-1"
+              />
+              <div className="w-32">
+                <CurrencySelect
+                  id="tx-currency"
+                  aria-label="Currency"
+                  value={form.watch("currency") ?? baseCurrency}
+                  onChange={(v) => form.setValue("currency", v as SupportedCurrency, { shouldValidate: true })}
+                />
+              </div>
+            </div>
             {form.formState.errors.amount && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.amount.message}
-              </p>
+              <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>
             )}
           </div>
 
@@ -184,9 +238,7 @@ export function TransactionFormDialog(props: Props) {
             <Label htmlFor="tx-date">Date</Label>
             <Input id="tx-date" type="date" {...form.register("date")} />
             {form.formState.errors.date && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.date.message}
-              </p>
+              <p className="text-sm text-destructive">{form.formState.errors.date.message}</p>
             )}
           </div>
 
@@ -194,9 +246,7 @@ export function TransactionFormDialog(props: Props) {
             <Label htmlFor="tx-category">Category</Label>
             <Select
               value={String(form.watch("category_id") || "")}
-              onValueChange={(v) =>
-                form.setValue("category_id", Number(v), { shouldValidate: true })
-              }
+              onValueChange={(v) => form.setValue("category_id", Number(v), { shouldValidate: true })}
             >
               <SelectTrigger id="tx-category">
                 <SelectValue placeholder="Pick a category" />
@@ -210,9 +260,7 @@ export function TransactionFormDialog(props: Props) {
               </SelectContent>
             </Select>
             {form.formState.errors.category_id && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.category_id.message}
-              </p>
+              <p className="text-sm text-destructive">{form.formState.errors.category_id.message}</p>
             )}
           </div>
 
@@ -222,16 +270,10 @@ export function TransactionFormDialog(props: Props) {
               <ToggleGroup
                 type="single"
                 value={direction}
-                onValueChange={(v) => {
-                  if (v) form.setValue("direction", v as "deposit" | "withdraw");
-                }}
+                onValueChange={(v) => v && form.setValue("direction", v as "deposit" | "withdraw")}
               >
-                <ToggleGroupItem value="deposit" aria-label="Deposit">
-                  ↑ Deposit
-                </ToggleGroupItem>
-                <ToggleGroupItem value="withdraw" aria-label="Withdraw">
-                  ↓ Withdraw
-                </ToggleGroupItem>
+                <ToggleGroupItem value="deposit" aria-label="Deposit">↑ Deposit</ToggleGroupItem>
+                <ToggleGroupItem value="withdraw" aria-label="Withdraw">↓ Withdraw</ToggleGroupItem>
               </ToggleGroup>
             </div>
           )}
@@ -248,16 +290,24 @@ export function TransactionFormDialog(props: Props) {
                 checked={form.watch("is_recurring")}
                 onCheckedChange={(v) => form.setValue("is_recurring", v)}
               />
-              <Label htmlFor="tx-recurring" className="cursor-pointer">
-                Monthly recurring
-              </Label>
+              <Label htmlFor="tx-recurring" className="cursor-pointer">Monthly recurring</Label>
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
+            {!isEdit && (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={submitting}
+                onClick={form.handleSubmit((v) => onCreate(v, false))}
+              >
+                Save and add another
+              </Button>
+            )}
             <Button type="submit" disabled={submitting}>
               {submitting ? "Saving…" : isEdit ? "Update" : "Create"}
             </Button>

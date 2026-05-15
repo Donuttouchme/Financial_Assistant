@@ -25,11 +25,12 @@ function reportError(err: unknown) {
 export function useCreateTransaction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: TransactionCreatePayload) => createTransaction(payload),
-    onSuccess: () => {
+    mutationFn: (args: { payload: TransactionCreatePayload; silent?: boolean }) =>
+      createTransaction(args.payload),
+    onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: [TX_KEY_ROOT] });
       qc.invalidateQueries({ queryKey: ["budgets"] });
-      toast.success("Transaction added");
+      if (!vars.silent) toast.success("Transaction added");
     },
     onError: reportError,
   });
