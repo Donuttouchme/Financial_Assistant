@@ -79,3 +79,25 @@ describe("useTheme (cyberpunk)", () => {
     expect(result.current.theme).toBe("cyberpunk");
   });
 });
+
+describe("useTheme (favicon)", () => {
+  beforeEach(() => {
+    document.documentElement.classList.remove("dark", "sakura", "cyberpunk");
+    window.localStorage.clear();
+    document.querySelectorAll('link[rel="icon"]').forEach((el) => el.remove());
+  });
+
+  it("swaps the favicon href when theme changes", () => {
+    const { result } = renderHook(() => useTheme());
+
+    act(() => result.current.setTheme("cyberpunk"));
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    expect(link).not.toBeNull();
+    // Cyberpunk neon yellow #fcee0a appears in the data URL (URL-encoded as %23fcee0a).
+    expect(link!.href).toContain("fcee0a");
+
+    act(() => result.current.setTheme("sakura"));
+    const link2 = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    expect(link2!.href).toContain("e35d8a");
+  });
+});

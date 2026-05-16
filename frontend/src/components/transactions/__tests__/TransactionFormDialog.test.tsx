@@ -172,7 +172,7 @@ describe("TransactionFormDialog — create flow", () => {
   it("currency dropdown defaults to base currency", async () => {
     render(wrap(<TransactionFormDialog mode="create" open onOpenChange={() => {}} />));
     await waitFor(() => {
-      expect(screen.getByLabelText(/currency/i)).toHaveValue("CHF");
+      expect(screen.getByLabelText(/currency/i).textContent).toMatch(/CHF/);
     });
   });
 
@@ -180,7 +180,7 @@ describe("TransactionFormDialog — create flow", () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
     render(wrap(<TransactionFormDialog mode="create" open onOpenChange={onOpenChange} />));
-    await waitFor(() => expect(screen.getByLabelText(/currency/i)).toHaveValue("CHF"));
+    await waitFor(() => expect(screen.getByLabelText(/currency/i).textContent).toMatch(/CHF/));
 
     await user.type(screen.getByLabelText(/^amount$/i), "12.50");
     // Radix Select requires fireEvent (userEvent triggers pointer events that jsdom doesn't support)
@@ -207,7 +207,7 @@ describe("TransactionFormDialog — create flow", () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
     render(wrap(<TransactionFormDialog mode="create" open onOpenChange={onOpenChange} />));
-    await waitFor(() => expect(screen.getByLabelText(/currency/i)).toHaveValue("CHF"));
+    await waitFor(() => expect(screen.getByLabelText(/currency/i).textContent).toMatch(/CHF/));
 
     await user.type(screen.getByLabelText(/^amount$/i), "5");
     // Radix Select requires fireEvent

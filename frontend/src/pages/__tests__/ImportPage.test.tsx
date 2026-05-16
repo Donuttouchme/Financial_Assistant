@@ -42,7 +42,7 @@ describe("ImportPage — currency UI", () => {
     render(wrap(<ImportPage />));
     await showConfigPanel();
     await waitFor(() => {
-      expect(screen.getByLabelText(/default currency/i)).toHaveValue("CHF");
+      expect(screen.getByLabelText(/default currency/i).textContent).toMatch(/CHF/);
     });
   });
 

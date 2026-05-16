@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
@@ -21,7 +21,7 @@ describe("EmptyAppState — currency picker", () => {
   it("shows currency dropdown defaulting to base", async () => {
     render(wrap(<EmptyAppState />));
     await waitFor(() => {
-      expect(screen.getByLabelText(/default currency/i)).toHaveValue("CHF");
+      expect(screen.getByLabelText(/default currency/i).textContent).toMatch(/CHF/);
     });
   });
 
@@ -31,7 +31,9 @@ describe("EmptyAppState — currency picker", () => {
     await waitFor(() => {
       expect(screen.getByLabelText(/default currency/i)).toBeInTheDocument();
     });
-    await user.selectOptions(screen.getByLabelText(/default currency/i), "HUF");
+    fireEvent.click(screen.getByLabelText(/default currency/i));
+    const huf = await screen.findByRole("option", { name: /HUF/i });
+    fireEvent.click(huf);
     await user.click(screen.getByRole("button", { name: /save currency/i }));
     await waitFor(() => {
       expect(testState.settings.base_currency).toBe("HUF");

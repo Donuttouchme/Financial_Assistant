@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CurrencySection } from "@/components/settings/CurrencySection";
@@ -16,7 +16,7 @@ describe("CurrencySection", () => {
   it("shows current base currency", async () => {
     render(wrap(<CurrencySection />));
     await waitFor(() => {
-      expect(screen.getByLabelText(/base currency/i)).toHaveValue("CHF");
+      expect(screen.getByLabelText(/base currency/i).textContent).toMatch(/CHF/);
     });
   });
 
@@ -31,9 +31,10 @@ describe("CurrencySection", () => {
     const user = userEvent.setup();
     render(wrap(<CurrencySection />));
     await waitFor(() => {
-      expect(screen.getByLabelText(/base currency/i)).toHaveValue("CHF");
+      expect(screen.getByLabelText(/base currency/i).textContent).toMatch(/CHF/);
     });
-    await user.selectOptions(screen.getByLabelText(/base currency/i), "EUR");
+    fireEvent.click(screen.getByLabelText(/base currency/i));
+    fireEvent.click(await screen.findByRole("option", { name: /EUR/i }));
     await user.click(screen.getByRole("button", { name: /change base currency/i }));
     await waitFor(() => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -45,7 +46,8 @@ describe("CurrencySection", () => {
     const user = userEvent.setup();
     render(wrap(<CurrencySection />));
     await waitFor(() => expect(screen.getByLabelText(/base currency/i)).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText(/base currency/i), "HUF");
+    fireEvent.click(screen.getByLabelText(/base currency/i));
+    fireEvent.click(await screen.findByRole("option", { name: /HUF/i }));
     await user.click(screen.getByRole("button", { name: /change base currency/i }));
     await waitFor(() => screen.getByRole("dialog"));
     await user.click(screen.getByRole("button", { name: /confirm/i }));

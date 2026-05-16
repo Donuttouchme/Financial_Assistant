@@ -1,36 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { CurrencySelect } from "@/components/forms/CurrencySelect";
 
 describe("CurrencySelect", () => {
-  it("renders all 31 currencies in two optgroups", () => {
+  it("trigger displays the selected currency", () => {
+    render(<CurrencySelect value="HUF" onChange={() => {}} />);
+    const trigger = screen.getByRole("combobox", { name: /currency/i });
+    expect(trigger.textContent).toMatch(/HUF/);
+  });
+
+  it("opens with both groups and 31 options", async () => {
     render(<CurrencySelect value="CHF" onChange={() => {}} />);
-    const groups = screen.getAllByRole("group");
-    expect(groups).toHaveLength(2);
-    expect(groups[0]).toHaveAttribute("label", "Most used");
-    expect(groups[1]).toHaveAttribute("label", "All currencies");
+    fireEvent.click(screen.getByRole("combobox", { name: /currency/i }));
+    expect(await screen.findByText("Most used")).toBeInTheDocument();
+    expect(screen.getByText("All currencies")).toBeInTheDocument();
     const options = screen.getAllByRole("option");
     expect(options.length).toBe(31);
   });
 
-  it("displays selected currency", () => {
-    render(<CurrencySelect value="HUF" onChange={() => {}} />);
-    const select = screen.getByRole("combobox");
-    expect(select).toHaveValue("HUF");
-  });
-
-  it("calls onChange when selection changes", async () => {
-    const user = userEvent.setup();
+  it("calls onChange when an option is picked", async () => {
     let last = "";
     render(<CurrencySelect value="CHF" onChange={(v) => (last = v)} />);
-    await user.selectOptions(screen.getByRole("combobox"), "EUR");
+    fireEvent.click(screen.getByRole("combobox", { name: /currency/i }));
+    const eur = await screen.findByRole("option", { name: /EUR/i });
+    fireEvent.click(eur);
     expect(last).toBe("EUR");
   });
 
-  it("rows include symbol + code + name", () => {
+  it("rows include symbol + code + name", async () => {
     render(<CurrencySelect value="USD" onChange={() => {}} />);
-    expect(screen.getByRole("option", { name: /USD/ }).textContent).toContain("$");
-    expect(screen.getByRole("option", { name: /USD/ }).textContent).toContain("USD");
+    fireEvent.click(screen.getByRole("combobox", { name: /currency/i }));
+    const usd = await screen.findByRole("option", { name: /USD/i });
+    expect(usd.textContent).toContain("$");
+    expect(usd.textContent).toContain("USD");
+    expect(usd.textContent).toContain("US Dollar");
   });
 });
