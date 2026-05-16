@@ -160,3 +160,40 @@ def test_commit_with_config_default_currency(client):
     txs = client.get("/api/transactions?month=2026-05").json()
     assert len(txs) == 1
     assert txs[0]["currency"] == "CHF"
+
+
+def test_commit_eager_fills_fx_rates_for_each_unique_date(client, monkeypatch):
+    """commit_import should call fetch_rates_for_date once per unique row date."""
+    from datetime import date
+    from decimal import Decimal as _D
+    from app.services import fx_service
+
+    seen: list[date] = []
+
+    async def stub_fetch(target):
+        seen.append(target)
+        return {"EUR": _D("1.0"), "USD": _D("1.08"), "CHF": _D("0.96"), "GBP": _D("0.85")}
+
+    monkeypatch.setattr(fx_service, "fetch_rates_for_date", stub_fetch)
+
+    cat = _seed_category(client, kind="income")
+    # Two rows on 2026-05-14, one on 2026-05-15 — fetch_rates_for_date should
+    # be called exactly twice (one per unique date) thanks to the set in
+    # ensure_rates_for_dates.
+    payload = {
+        "file_content": (
+            "2026-05-14;bonus;20.00\n"
+            "2026-05-14;gift;3.50\n"
+            "2026-05-15;tip;1.00\n"
+        ),
+        "config": {**_BASE_CONFIG},
+        "selections": [
+            {"row_index": 0, "category_id": cat["id"], "is_recurring": False},
+            {"row_index": 1, "category_id": cat["id"], "is_recurring": False},
+            {"row_index": 2, "category_id": cat["id"], "is_recurring": False},
+        ],
+        "default_currency": "USD",
+    }
+    r = client.post("/api/import/commit", json=payload)
+    assert r.status_code == 200
+    assert set(seen) == {date(2026, 5, 14), date(2026, 5, 15)}

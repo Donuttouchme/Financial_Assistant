@@ -28,7 +28,8 @@ def _no_real_fx_refresh(request, monkeypatch):
         return {}
 
     async def noop_fetch_today():
-        return {}
+        from datetime import date as _date
+        return _date.today(), {}
 
     monkeypatch.setattr(fx_service, "refresh_today", noop_refresh)
     monkeypatch.setattr(fx_service, "fetch_rates_for_date", noop_fetch_for_date)

@@ -57,8 +57,10 @@ async def test_fetch_rates_for_today_uses_latest_endpoint(monkeypatch):
 
     monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
 
-    await fx_service.fetch_rates_for_today()
+    api_date, rates = await fx_service.fetch_rates_for_today()
     assert captured["url"].endswith("/latest")
+    assert api_date == date(2026, 5, 15)
+    assert rates["USD"] == Decimal("1.08")
 
 
 @pytest.mark.asyncio

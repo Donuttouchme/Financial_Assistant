@@ -49,7 +49,13 @@ async def fetch_rates_for_date(target: date) -> dict[str, Decimal]:
     return _parse_response(response.json())
 
 
-async def fetch_rates_for_today() -> dict[str, Decimal]:
+async def fetch_rates_for_today() -> tuple[date, dict[str, Decimal]]:
+    """Fetch /latest. Returns (rate_date_from_api, rates).
+
+    The API echoes the actual business-day date of the rates (e.g. Friday's
+    date on Saturday/Sunday since ECB doesn't publish on weekends). Callers
+    should use that date when persisting, not date.today().
+    """
     url = f"{FRANKFURTER_BASE_URL}/latest"
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
@@ -60,7 +66,11 @@ async def fetch_rates_for_today() -> dict[str, Decimal]:
         raise FxFetchError(
             f"frankfurter.app returned {response.status_code} for latest: {response.text[:200]}"
         )
-    return _parse_response(response.json())
+    payload = response.json()
+    api_date_str = payload.get("date")
+    if not api_date_str:
+        raise FxFetchError("frankfurter.app /latest response missing 'date' field")
+    return date.fromisoformat(api_date_str), _parse_response(payload)
 
 
 def get_latest_date(db: Session) -> date | None:
@@ -114,15 +124,17 @@ async def ensure_rates_for_date(db: Session, when: date) -> None:
 
 
 async def refresh_today(db: Session) -> tuple[date | None, int]:
-    """Fetch /latest and upsert. Returns (fetched_date, currencies_updated).
+    """Fetch /latest and upsert. Returns (rate_date, currencies_updated).
+
+    rate_date is the API-reported business day, not today() — on weekends
+    /latest returns Friday's rates with Friday's date.
 
     Used by lifespan startup and by POST /api/fx/refresh.
     """
     try:
-        rates = await fetch_rates_for_today()
+        when, rates = await fetch_rates_for_today()
     except FxFetchError:
         return (None, 0)
-    when = date.today()
     count = _upsert_rates(db, when, rates)
     return (when, count)
 
