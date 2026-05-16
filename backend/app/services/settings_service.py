@@ -59,7 +59,7 @@ def _convert(amount: Decimal, old_base: str, new_base: str, db: Session, when: d
     return (amount * r_old / r_new).quantize(_TWO_PLACES)
 
 
-def preview_base_currency_change(db: Session, new_base: str) -> dict:
+def preview_base_currency_change(db: Session, new_base: str, user_id: int) -> dict:
     code = new_base.upper()
     if code not in SUPPORTED_CURRENCIES:
         raise ValueError(f"unknown currency: {new_base!r}")
@@ -70,6 +70,7 @@ def preview_base_currency_change(db: Session, new_base: str) -> dict:
     budgets = db.execute(
         select(BudgetLimit, Category.name)
         .join(Category, Category.id == BudgetLimit.category_id)
+        .where(BudgetLimit.user_id == user_id)
     ).all()
     budget_rows = []
     for b, name in budgets:
@@ -83,7 +84,8 @@ def preview_base_currency_change(db: Session, new_base: str) -> dict:
         })
 
     goals = db.execute(
-        select(Category).where(Category.target_amount.is_not(None))
+        select(Category)
+        .where(Category.user_id == user_id, Category.target_amount.is_not(None))
     ).scalars().all()
     goal_rows = []
     for c in goals:
@@ -105,7 +107,7 @@ def preview_base_currency_change(db: Session, new_base: str) -> dict:
     }
 
 
-def commit_base_currency_change(db: Session, new_base: str) -> Settings:
+def commit_base_currency_change(db: Session, new_base: str, user_id: int) -> Settings:
     code = new_base.upper()
     if code not in SUPPORTED_CURRENCIES:
         raise ValueError(f"unknown currency: {new_base!r}")
@@ -116,13 +118,26 @@ def commit_base_currency_change(db: Session, new_base: str) -> Settings:
 
     today = date.today()
 
-    for b in db.execute(select(BudgetLimit)).scalars().all():
-        b.monthly_limit = _convert(b.monthly_limit, old_base, code, db, today)
+    # Compute all conversions first so a mid-loop FxNotAvailableError can't
+    # leave the session with a partial mutation (rolled back on next request,
+    # but explicit is safer than relying on request-scoped teardown).
+    budget_updates: list[tuple[BudgetLimit, Decimal]] = []
+    for b in db.execute(
+        select(BudgetLimit).where(BudgetLimit.user_id == user_id)
+    ).scalars().all():
+        budget_updates.append((b, _convert(b.monthly_limit, old_base, code, db, today)))
 
+    goal_updates: list[tuple[Category, Decimal]] = []
     for c in db.execute(
-        select(Category).where(Category.target_amount.is_not(None))
+        select(Category)
+        .where(Category.user_id == user_id, Category.target_amount.is_not(None))
     ).scalars().all():
         if c.target_amount is not None:
-            c.target_amount = _convert(c.target_amount, old_base, code, db, today)
+            goal_updates.append((c, _convert(c.target_amount, old_base, code, db, today)))
+
+    for b, new_amount in budget_updates:
+        b.monthly_limit = new_amount
+    for c, new_amount in goal_updates:
+        c.target_amount = new_amount
 
     return set_base_currency(db, code)

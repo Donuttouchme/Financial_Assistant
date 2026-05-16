@@ -6,6 +6,8 @@ import pytest
 
 from app.services import fx_service
 
+pytestmark = pytest.mark.real_fx_client
+
 
 @pytest.mark.asyncio
 async def test_fetch_rates_for_date_parses_response(monkeypatch):
