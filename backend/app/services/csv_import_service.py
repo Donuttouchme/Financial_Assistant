@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 from io import StringIO
 
 from app.schemas.csv_import import CsvImportConfig, ParsedRow
+from app.services.currencies import SUPPORTED_CURRENCIES
 
 
 def _normalize_number(raw: str, decimal_sep: str, thousands_sep: str) -> Decimal:
@@ -77,6 +78,15 @@ def parse_csv(text: str, config: CsvImportConfig) -> list[ParsedRow]:
                 row.kind_hint = "expense" if row.amount < 0 else "income"
             else:
                 row.kind_hint = "income" if row.amount < 0 else "expense"
+
+        # Per-row currency column (optional)
+        if cols.currency is not None and cols.currency < len(raw):
+            raw_currency = raw[cols.currency].strip().upper()
+            if raw_currency:
+                if raw_currency not in SUPPORTED_CURRENCIES:
+                    row.errors.append(f"unsupported currency: {raw_currency!r}")
+                else:
+                    row.currency = raw_currency
 
         out.append(row)
 

@@ -10,13 +10,13 @@ router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
-def create_transaction(
+async def create_transaction(
     payload: TransactionCreate,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     try:
-        return transaction_service.create_transaction(
+        tx = await transaction_service.create_transaction_async(
             db,
             user_id=user_id,
             amount=payload.amount,
@@ -24,7 +24,9 @@ def create_transaction(
             category_id=payload.category_id,
             description=payload.description,
             is_recurring=payload.is_recurring,
+            currency=payload.currency,
         )
+        return transaction_service.enrich_with_base_amount(db, [tx])[0]
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
@@ -38,20 +40,21 @@ def list_transactions(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return transaction_service.list_transactions(
+    txs = transaction_service.list_transactions(
         db, user_id=user_id, month=month, category_id=category_id
     )
+    return transaction_service.enrich_with_base_amount(db, txs)
 
 
 @router.put("/{transaction_id}", response_model=TransactionRead)
-def update_transaction(
+async def update_transaction(
     transaction_id: int,
     payload: TransactionUpdate,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     try:
-        return transaction_service.update_transaction(
+        tx = await transaction_service.update_transaction_async(
             db,
             user_id=user_id,
             transaction_id=transaction_id,
@@ -59,7 +62,9 @@ def update_transaction(
             tx_date=payload.date,
             category_id=payload.category_id,
             description=payload.description,
+            currency=payload.currency,
         )
+        return transaction_service.enrich_with_base_amount(db, [tx])[0]
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:

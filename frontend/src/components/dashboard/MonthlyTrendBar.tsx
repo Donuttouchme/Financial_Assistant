@@ -9,7 +9,8 @@ import {
 import { listTransactions } from "@/api/transactions";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { format, parse, subMonths } from "date-fns";
-import { formatChf } from "@/lib/currency";
+import { formatMoney } from "@/lib/money";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 
 interface Props { month: string }
 
@@ -31,6 +32,7 @@ export function MonthlyTrendBar({ month }: Props) {
     })),
   });
   const { data: cats, isLoading: catsLoading } = useCategories();
+  const baseCurrency = useBaseCurrency();
 
   const isLoading = catsLoading || queries.some((q) => q.isLoading);
 
@@ -43,7 +45,7 @@ export function MonthlyTrendBar({ month }: Props) {
       const txs = queries[i].data ?? [];
       const total = txs
         .filter((t) => expense.has(t.category_id))
-        .reduce((s, t) => s + Number(t.amount), 0);
+        .reduce((s, t) => s + (t.base_amount === null ? 0 : Number(t.base_amount)), 0);
       return {
         month: format(parse(m, "yyyy-MM", new Date()), "MMM"),
         total,
@@ -72,7 +74,7 @@ export function MonthlyTrendBar({ month }: Props) {
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    formatter={(value) => formatChf(Number(value))}
+                    formatter={(value) => formatMoney(Number(value), baseCurrency)}
                   />
                 }
               />

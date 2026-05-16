@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { useBudgetsForMonth, useSetBudget } from "@/hooks/queries/useBudgets";
-import { formatChf, parseChfInput } from "@/lib/currency";
+import { formatMoney, parseMoneyInput } from "@/lib/money";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 import { cn } from "@/lib/utils";
 
 interface Props { month: string }
@@ -32,6 +33,7 @@ export function BudgetsTable({ month }: Props) {
   const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: budgets, isLoading: budgetsLoading } = useBudgetsForMonth(month);
   const setBudget = useSetBudget();
+  const baseCurrency = useBaseCurrency();
 
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
@@ -64,7 +66,7 @@ export function BudgetsTable({ month }: Props) {
 
   function commitEdit(categoryId: number) {
     try {
-      const cleaned = parseChfInput(draft);
+      const cleaned = parseMoneyInput(draft);
       if (Number(cleaned) < 0) throw new Error("negative");
       setBudget.mutate(
         {
@@ -130,7 +132,7 @@ export function BudgetsTable({ month }: Props) {
                   </div>
                 ) : (
                   <span className="tabular-nums">
-                    {b ? formatChf(b.monthly_limit) : "—"}
+                    {b ? formatMoney(b.monthly_limit, baseCurrency) : "—"}
                   </span>
                 )}
               </TableCell>
@@ -139,7 +141,7 @@ export function BudgetsTable({ month }: Props) {
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 <span className={over ? "text-destructive font-medium" : ""}>
-                  {b ? formatChf(b.spent) : "—"}
+                  {b ? formatMoney(b.spent, baseCurrency) : "—"}
                 </span>
                 {over && (
                   <Badge variant="destructive" className="ml-2 gap-1">

@@ -1,3 +1,86 @@
+from datetime import date
+from decimal import Decimal
+
+
+def test_transaction_read_has_base_amount_same_currency(client, db_session):
+    from app.models.category import Category
+    from app.services import settings_service
+
+    settings_service.set_base_currency(db_session, "CHF")
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+
+    resp = client.post(
+        "/api/transactions",
+        json={
+            "amount": "12.50",
+            "date": "2026-05-14",
+            "category_id": cat.id,
+            "description": "lunch",
+            "currency": "CHF",
+        },
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["currency"] == "CHF"
+    assert body["base_amount"] == "12.50"
+
+
+def test_transaction_read_base_amount_converts(client, db_session):
+    from app.models.category import Category
+    from app.models.fx_rate import FxRate
+    from app.services import settings_service
+
+    settings_service.set_base_currency(db_session, "CHF")
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    # CHF: 0.96 EUR ; EUR: 1.0 EUR -> 1 EUR = 1/0.96 CHF
+    # transaction amount 100 EUR -> base = 100 * 1.0 / 0.96 = 104.166666... CHF
+    db_session.add(FxRate(currency="EUR", date=date(2026, 5, 14), rate_to_eur=Decimal("1.0")))
+    db_session.add(FxRate(currency="CHF", date=date(2026, 5, 14), rate_to_eur=Decimal("0.96")))
+    db_session.commit()
+
+    resp = client.post(
+        "/api/transactions",
+        json={
+            "amount": "100.00",
+            "date": "2026-05-14",
+            "category_id": cat.id,
+            "description": "x",
+            "currency": "EUR",
+        },
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["currency"] == "EUR"
+    assert Decimal(body["base_amount"]).quantize(Decimal("0.01")) == Decimal("104.17")
+
+
+def test_transaction_read_base_amount_none_when_missing_rate(client, db_session):
+    from app.models.category import Category
+    from app.services import settings_service
+
+    settings_service.set_base_currency(db_session, "CHF")
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+
+    resp = client.post(
+        "/api/transactions",
+        json={
+            "amount": "100.00",
+            "date": "2026-05-14",
+            "category_id": cat.id,
+            "description": "x",
+            "currency": "EUR",
+        },
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["base_amount"] is None
+
+
 def test_create_transaction_returns_201(client):
     cat_id = client.post("/api/categories", json={"name": "Groceries"}).json()["id"]
     response = client.post(

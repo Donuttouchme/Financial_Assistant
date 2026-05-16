@@ -1,16 +1,16 @@
-import { Moon, Sun, Flower2 } from "lucide-react";
-import { useTheme } from "@/hooks/useTheme";
+import { Moon, Sun, Flower2, Zap } from "lucide-react";
+import { useTheme, type Theme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 
-type ThemeName = "sakura" | "light" | "dark";
 const OPTIONS: Array<{
-  key: ThemeName;
+  key: Theme;
   label: string;
   Icon: React.ComponentType<{ className?: string }>;
 }> = [
-  { key: "sakura", label: "Sakura theme", Icon: Flower2 },
-  { key: "light",  label: "Light theme",  Icon: Sun },
-  { key: "dark",   label: "Dark theme",   Icon: Moon },
+  { key: "light",     label: "Light theme",     Icon: Sun },
+  { key: "dark",      label: "Dark theme",      Icon: Moon },
+  { key: "sakura",    label: "Sakura theme",    Icon: Flower2 },
+  { key: "cyberpunk", label: "Cyberpunk theme", Icon: Zap },
 ];
 
 export function ThemeToggle() {

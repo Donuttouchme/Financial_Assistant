@@ -20,6 +20,9 @@ class RecurringSchedule(Base):
         ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False
     )
     description: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, default="CHF", server_default="CHF"
+    )
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     next_occurrence_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     frequency: Mapped[str] = mapped_column(String(16), nullable=False, default="monthly")

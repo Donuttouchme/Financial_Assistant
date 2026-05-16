@@ -11,10 +11,15 @@ changes, data backfills) switch to Alembic.
 from sqlalchemy import Engine
 
 
-# (table, column, type_with_null_or_default)
+# (table, column, type_with_null_or_default).
+# All entries are static, code-owned values — never user input. The f-string
+# substitution below is therefore safe; if a future entry is ever sourced from
+# user input, switch to a hardcoded allowlist and refuse anything else.
 _COLUMN_ADDS: list[tuple[str, str, str]] = [
     ("categories", "target_amount", "NUMERIC(12,2)"),
     ("categories", "target_date", "DATE"),
+    ("transactions", "currency", "TEXT NOT NULL DEFAULT 'CHF'"),
+    ("recurring_schedules", "currency", "TEXT NOT NULL DEFAULT 'CHF'"),
 ]
 
 

@@ -1,35 +1,37 @@
 import csv
 import io
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.category import Category
-from app.models.transaction import Transaction
-from app.services.transaction_service import _month_bounds
+from app.services import settings_service, transaction_service
 
 
 def export_transactions_csv(db: Session, *, user_id: int, month: str | None = None) -> str:
-    stmt = (
-        select(Transaction, Category.name)
-        .join(Category, Category.id == Transaction.category_id)
-        .where(Transaction.user_id == user_id)
-    )
-    if month:
-        start, end = _month_bounds(month)
-        stmt = stmt.where(Transaction.date >= start, Transaction.date < end)
-    stmt = stmt.order_by(Transaction.date.desc(), Transaction.id.desc())
+    txs = transaction_service.list_transactions(db, user_id=user_id, month=month)
+    enriched = transaction_service.enrich_with_base_amount(db, txs)
+    base_currency = settings_service.get_settings(db).base_currency
 
-    rows = db.execute(stmt).all()
+    # Build a category-id → name lookup from the already-loaded transactions
+    from sqlalchemy import select
+    from app.models.category import Category
+    cat_names = {
+        c.id: c.name
+        for c in db.execute(
+            select(Category).where(Category.user_id == user_id)
+        ).scalars().all()
+    }
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["date", "category", "description", "amount"])
-    for tx, cat_name in rows:
+    writer.writerow(["date", "amount", "currency", "category", "description", "base_amount", "base_currency"])
+    for row in enriched:
         writer.writerow([
-            tx.date.isoformat(),
-            cat_name,
-            tx.description,
-            f"{tx.amount:.2f}",
+            row["date"].isoformat(),
+            f"{row['amount']:.2f}",
+            row["currency"],
+            cat_names.get(row["category_id"], f"#{row['category_id']}"),
+            row["description"],
+            str(row["base_amount"]) if row["base_amount"] is not None else "",
+            base_currency,
         ])
     return buf.getvalue()

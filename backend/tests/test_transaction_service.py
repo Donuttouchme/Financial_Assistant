@@ -233,6 +233,78 @@ def test_update_transaction_validates_against_new_category_kind(db_session):
     assert updated.category_id == savings_cat.id
 
 
+def test_create_transaction_persists_currency(db_session):
+    from decimal import Decimal
+    from datetime import date
+
+    from app.services import transaction_service
+    from app.models.category import Category
+
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+
+    tx = transaction_service.create_transaction(
+        db_session,
+        user_id=1,
+        amount=Decimal("12.50"),
+        tx_date=date(2026, 5, 14),
+        category_id=cat.id,
+        description="lunch",
+        currency="EUR",
+    )
+    assert tx.currency == "EUR"
+
+
+def test_create_transaction_defaults_currency_to_base(db_session):
+    from decimal import Decimal
+    from datetime import date
+
+    from app.services import transaction_service
+    from app.models.category import Category
+    from app.services import settings_service
+
+    settings_service.set_base_currency(db_session, "HUF")
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+
+    tx = transaction_service.create_transaction(
+        db_session,
+        user_id=1,
+        amount=Decimal("12.50"),
+        tx_date=date(2026, 5, 14),
+        category_id=cat.id,
+        description="lunch",
+        currency=None,
+    )
+    assert tx.currency == "HUF"
+
+
+def test_create_transaction_rejects_unknown_currency(db_session):
+    from decimal import Decimal
+    from datetime import date
+    import pytest
+
+    from app.services import transaction_service
+    from app.models.category import Category
+
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+
+    with pytest.raises(ValueError, match="unknown currency"):
+        transaction_service.create_transaction(
+            db_session,
+            user_id=1,
+            amount=Decimal("12.50"),
+            tx_date=date(2026, 5, 14),
+            category_id=cat.id,
+            description="x",
+            currency="ZZZ",
+        )
+
+
 def test_update_transaction_reparent_rejects_invalid_existing_amount(db_session):
     """Re-parent: savings tx with negative amount → expense category, no amount change.
 
@@ -257,3 +329,81 @@ def test_update_transaction_reparent_rejects_invalid_existing_amount(db_session)
         transaction_service.update_transaction(
             db_session, user_id=1, transaction_id=tx.id, category_id=expense_cat.id
         )
+
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_create_transaction_triggers_eager_fill(db_session, monkeypatch):
+    from datetime import date
+    from decimal import Decimal
+
+    from app.models.category import Category
+    from app.services import transaction_service, fx_service
+
+    called: list[date] = []
+
+    async def stub_ensure(db, when):
+        called.append(when)
+
+    monkeypatch.setattr(fx_service, "ensure_rates_for_date", stub_ensure)
+
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+
+    await transaction_service.create_transaction_async(
+        db_session,
+        user_id=1,
+        amount=Decimal("100"),
+        tx_date=date(2026, 5, 14),
+        category_id=cat.id,
+        description="x",
+        currency="EUR",
+    )
+    assert called == [date(2026, 5, 14)]
+
+
+@pytest.mark.asyncio
+async def test_update_transaction_currency_only_does_not_eager_fill(db_session, monkeypatch):
+    """A currency-only update (no date change) intentionally skips eager fill.
+
+    base_amount will be null on read until the user changes the date or
+    refreshes rates manually. This documents that offline-safe behavior so a
+    future change to ensure_rates_for_date doesn't silently break it.
+    """
+    from datetime import date
+    from decimal import Decimal
+
+    from app.models.category import Category
+    from app.services import transaction_service, fx_service
+
+    called: list[date] = []
+
+    async def stub_ensure(db, when):
+        called.append(when)
+
+    monkeypatch.setattr(fx_service, "ensure_rates_for_date", stub_ensure)
+
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+
+    tx = transaction_service.create_transaction(
+        db_session,
+        user_id=1,
+        amount=Decimal("100"),
+        tx_date=date(2026, 5, 14),
+        category_id=cat.id,
+        description="x",
+        currency="EUR",
+    )
+
+    await transaction_service.update_transaction_async(
+        db_session,
+        user_id=1,
+        transaction_id=tx.id,
+        currency="USD",
+    )
+    assert called == []  # no fetch because tx_date was not changed

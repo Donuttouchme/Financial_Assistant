@@ -14,7 +14,8 @@ from app.schemas.csv_import import (
     ImportCommitResponse,
     ParsedRow,
 )
-from app.services import csv_import_service, transaction_service
+from app.services import csv_import_service, fx_service, settings_service, transaction_service
+from app.services.currencies import SUPPORTED_CURRENCIES
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -48,7 +49,7 @@ def preview(
 
 
 @router.post("/commit", response_model=ImportCommitResponse)
-def commit(
+async def commit(
     payload: ImportCommitRequest,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -59,9 +60,29 @@ def commit(
     skipped = 0
     selected_indexes = {sel.row_index for sel in payload.selections}
 
+    # Determine currency fallback: explicit default_currency > config default > base currency
+    base_currency = settings_service.get_settings(db).base_currency
+    fallback = (
+        payload.default_currency
+        or payload.config.default_currency
+        or base_currency
+    ).upper()
+
+    # Eager-fill FX rates for all unique transaction dates upfront
+    unique_dates = {
+        r.date
+        for sel in payload.selections
+        if (r := by_index.get(sel.row_index)) is not None and r.date is not None
+    }
+    await fx_service.ensure_rates_for_dates(db, unique_dates)
+
     for sel in payload.selections:
         r = by_index.get(sel.row_index)
         if r is None or r.errors or r.amount is None or r.date is None:
+            skipped += 1
+            continue
+        currency = (r.currency or fallback).upper()
+        if currency not in SUPPORTED_CURRENCIES:
             skipped += 1
             continue
         try:
@@ -73,6 +94,7 @@ def commit(
                 category_id=sel.category_id,
                 description=r.description,
                 is_recurring=sel.is_recurring,
+                currency=currency,
             )
             imported += 1
         except (ValueError, LookupError):

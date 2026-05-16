@@ -14,7 +14,8 @@ from app import idle
 from app.database import Base, SessionLocal, engine
 from app.migrations import run_migrations
 from app.routers import budgets, categories, csv_import, export, health, heartbeat, import_presets, transactions
-from app.services import recurring_service
+from app.routers import settings as settings_router, fx as fx_router
+from app.services import recurring_service, fx_service, settings_service
 
 
 # Location of the built React app relative to this file:
@@ -31,6 +32,24 @@ async def lifespan(app: FastAPI):
         recurring_service.run_due_schedules(db, today=date.today())
     finally:
         db.close()
+
+    # Seed settings row (idempotent — won't overwrite existing values)
+    db = SessionLocal()
+    try:
+        settings_service.get_settings(db)
+    finally:
+        db.close()
+
+    # Kick off FX refresh in the background (non-blocking)
+    async def _refresh_fx():
+        db = SessionLocal()
+        try:
+            await fx_service.refresh_today(db)
+        finally:
+            db.close()
+
+    fx_task = asyncio.create_task(_refresh_fx())
+
     watchdog_task = idle.start_watchdog()
     try:
         yield
@@ -38,6 +57,11 @@ async def lifespan(app: FastAPI):
         watchdog_task.cancel()
         try:
             await watchdog_task
+        except asyncio.CancelledError:
+            pass
+        fx_task.cancel()
+        try:
+            await fx_task
         except asyncio.CancelledError:
             pass
 
@@ -67,6 +91,8 @@ app.include_router(budgets.router)
 app.include_router(export.router)
 app.include_router(import_presets.router)
 app.include_router(csv_import.router)
+app.include_router(settings_router.router)
+app.include_router(fx_router.router)
 
 
 # SPA fallback + cache headers.

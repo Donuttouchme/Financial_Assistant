@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { TransactionFormDialog } from "@/components/transactions/TransactionFormDialog";
-import { testState } from "@/tests/handlers";
+import { resetTestState, testState } from "@/tests/handlers";
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({
@@ -17,6 +18,10 @@ function wrap(node: React.ReactNode) {
 }
 
 describe("TransactionFormDialog", () => {
+  beforeEach(() => {
+    resetTestState();
+  });
+
   it("renders in create mode without crashing", async () => {
     render(
       wrap(
@@ -28,7 +33,7 @@ describe("TransactionFormDialog", () => {
       ),
     );
     expect(await screen.findByText("Add transaction")).toBeInTheDocument();
-    expect(screen.getByLabelText(/amount/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^amount$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/monthly recurring/i)).toBeInTheDocument();
   });
 
@@ -47,6 +52,8 @@ describe("TransactionFormDialog", () => {
             category_id: 1,
             description: "Milk",
             is_recurring: false,
+            currency: "CHF",
+            base_amount: null,
             created_at: "",
             updated_at: "",
           }}
@@ -61,6 +68,7 @@ describe("TransactionFormDialog", () => {
 
 describe("TransactionFormDialog savings flow", () => {
   beforeEach(() => {
+    resetTestState();
     testState.categories = [
       {
         id: 99,
@@ -87,7 +95,7 @@ describe("TransactionFormDialog savings flow", () => {
     expect(screen.queryByRole("group", { name: /direction/i })).toBeNull();
 
     // Open category select and pick the savings category.
-    const trigger = screen.getByRole("combobox");
+    const trigger = screen.getByRole("combobox", { name: /category/i });
     fireEvent.click(trigger);
     const opt = await screen.findByRole("option", {
       name: /vacation 2027 \(savings\)/i,
@@ -123,6 +131,8 @@ describe("TransactionFormDialog savings flow", () => {
             category_id: 99,
             description: "Withdrawal",
             is_recurring: false,
+            currency: "CHF",
+            base_amount: null,
             created_at: "",
             updated_at: "",
           }}
@@ -133,7 +143,7 @@ describe("TransactionFormDialog savings flow", () => {
     expect(await screen.findByText("Edit transaction")).toBeInTheDocument();
 
     // The amount input should show the absolute value.
-    const amountInput = screen.getByLabelText(/amount/i) as HTMLInputElement;
+    const amountInput = screen.getByLabelText(/^amount$/i) as HTMLInputElement;
     expect(amountInput.value).toBe("50");
 
     // Wait for categories to load, then the Direction group should appear.
@@ -146,5 +156,68 @@ describe("TransactionFormDialog savings flow", () => {
     const withdrawBtn = screen.getByRole("radio", { name: /withdraw/i });
     expect(withdrawBtn).toBeInTheDocument();
     expect(withdrawBtn).toHaveAttribute("aria-checked", "true");
+  });
+});
+
+describe("TransactionFormDialog — create flow", () => {
+  beforeEach(() => {
+    resetTestState();
+    testState.categories.push({
+      id: 1, name: "Food", kind: "expense",
+      target_amount: null, target_date: null,
+      created_at: new Date().toISOString(),
+    });
+  });
+
+  it("currency dropdown defaults to base currency", async () => {
+    render(wrap(<TransactionFormDialog mode="create" open onOpenChange={() => {}} />));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/currency/i).textContent).toMatch(/CHF/);
+    });
+  });
+
+  it("Save and add another keeps dialog open, clears amount, retains category", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    render(wrap(<TransactionFormDialog mode="create" open onOpenChange={onOpenChange} />));
+    await waitFor(() => expect(screen.getByLabelText(/currency/i).textContent).toMatch(/CHF/));
+
+    await user.type(screen.getByLabelText(/^amount$/i), "12.50");
+    // Radix Select requires fireEvent (userEvent triggers pointer events that jsdom doesn't support)
+    const trigger = screen.getByRole("combobox", { name: /category/i });
+    fireEvent.click(trigger);
+    const opt = await screen.findByRole("option", { name: /food/i });
+    fireEvent.click(opt);
+    await user.type(screen.getByLabelText(/description/i), "lunch");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save and add another/i }));
+    });
+
+    await waitFor(() => expect(testState.transactions.length).toBe(1));
+    // Dialog still open
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    // Amount cleared
+    expect(screen.getByLabelText(/^amount$/i)).toHaveValue("");
+    // Inline indicator shown
+    expect(screen.getByText(/saved/i)).toBeInTheDocument();
+  });
+
+  it("Create button closes the dialog", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    render(wrap(<TransactionFormDialog mode="create" open onOpenChange={onOpenChange} />));
+    await waitFor(() => expect(screen.getByLabelText(/currency/i).textContent).toMatch(/CHF/));
+
+    await user.type(screen.getByLabelText(/^amount$/i), "5");
+    // Radix Select requires fireEvent
+    const trigger = screen.getByRole("combobox", { name: /category/i });
+    fireEvent.click(trigger);
+    const opt = await screen.findByRole("option", { name: /food/i });
+    fireEvent.click(opt);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    });
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 });

@@ -24,6 +24,8 @@ export interface Transaction {
   category_id: number;
   description: string;
   is_recurring: boolean;
+  currency: string;
+  base_amount: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +36,7 @@ export interface TransactionCreatePayload {
   category_id: number;
   description: string;
   is_recurring?: boolean;
+  currency?: string;
 }
 
 export interface TransactionUpdatePayload {
@@ -41,6 +44,7 @@ export interface TransactionUpdatePayload {
   date?: string;
   category_id?: number;
   description?: string;
+  currency?: string;
 }
 
 export interface BudgetRead {
@@ -79,6 +83,7 @@ export interface CsvColumnMapping {
   amount?: number | null;
   debit?: number | null;
   credit?: number | null;
+  currency?: number | null;
 }
 
 export interface CsvImportConfig {
@@ -91,6 +96,7 @@ export interface CsvImportConfig {
   amount_format: AmountFormat;
   sign_convention: SignConvention;
   cols: CsvColumnMapping;
+  default_currency?: string | null;
 }
 
 export interface ParsedRow {
@@ -98,9 +104,41 @@ export interface ParsedRow {
   date: string | null;
   description: string;
   amount: string | null;
+  currency: string | null;
   kind_hint: "income" | "expense" | null;
   is_duplicate: boolean;
   errors: string[];
+}
+
+export interface SettingsRead {
+  base_currency: string;
+}
+
+export interface BaseCurrencyChangePreviewRow {
+  category_id: number;
+  category_name: string;
+  month?: string;
+  old_amount: string;
+  new_amount: string;
+}
+
+export interface BaseCurrencyChangePreview {
+  old_base: string;
+  new_base: string;
+  budgets: BaseCurrencyChangePreviewRow[];
+  savings_goals: BaseCurrencyChangePreviewRow[];
+}
+
+export interface FxStatusRead {
+  latest_date: string | null;
+  source: string;
+  is_fresh: boolean;
+}
+
+export interface FxRefreshResponse {
+  fetched_date: string | null;
+  currencies_updated: number;
+  ok: boolean;
 }
 
 export interface ImportPreset {

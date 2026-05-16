@@ -15,6 +15,7 @@ class CsvColumnMapping(BaseModel):
     amount: Optional[int] = None    # used in 'signed' mode
     debit: Optional[int] = None     # used in 'debit_credit' mode
     credit: Optional[int] = None    # used in 'debit_credit' mode
+    currency: Optional[int] = None  # per-row currency column (NEW)
 
 
 class CsvImportConfig(BaseModel):
@@ -27,6 +28,7 @@ class CsvImportConfig(BaseModel):
     amount_format: AmountFormat = "signed"
     sign_convention: SignConvention = "negative_is_expense"
     cols: CsvColumnMapping
+    default_currency: Optional[str] = Field(default=None, min_length=3, max_length=3)
 
 
 class ParsedRow(BaseModel):
@@ -37,6 +39,7 @@ class ParsedRow(BaseModel):
     kind_hint: Optional[Literal["income", "expense"]] = None
     is_duplicate: bool = False
     errors: list[str] = Field(default_factory=list)
+    currency: Optional[str] = None  # per-row currency read from CSV (NEW)
 
 
 class CsvPreviewRequest(BaseModel):
@@ -58,6 +61,7 @@ class ImportCommitRequest(BaseModel):
     file_content: str
     config: CsvImportConfig
     selections: list[ImportCommitRowSelection]
+    default_currency: Optional[str] = Field(default=None, min_length=3, max_length=3)
 
 
 class ImportCommitResponse(BaseModel):

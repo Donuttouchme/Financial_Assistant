@@ -31,8 +31,9 @@ def test_run_migrations_is_idempotent(tmp_path):
 
 
 def test_run_migrations_adds_missing_column_on_legacy_db():
-    # Simulate a pre-Task-2 legacy DB by creating the categories table without
-    # target_amount / target_date (the columns Task 1's migration runner adds).
+    # Simulate a legacy DB that predates all column-add migrations.
+    # We create the bare minimum tables (without the migrated columns) to verify
+    # that run_migrations adds them correctly.
     eng = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -51,10 +52,44 @@ def test_run_migrations_adds_missing_column_on_legacy_db():
             )
             """
         )
+        conn.exec_driver_sql(
+            """
+            CREATE TABLE transactions (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                amount NUMERIC(12,2) NOT NULL,
+                date DATE NOT NULL,
+                category_id INTEGER NOT NULL,
+                description VARCHAR(255) NOT NULL DEFAULT '',
+                is_recurring BOOLEAN NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.exec_driver_sql(
+            """
+            CREATE TABLE recurring_schedules (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                transaction_id INTEGER NOT NULL UNIQUE,
+                amount NUMERIC(12,2) NOT NULL,
+                category_id INTEGER NOT NULL,
+                description VARCHAR(255) NOT NULL DEFAULT '',
+                start_date DATE NOT NULL,
+                next_occurrence_date DATE NOT NULL,
+                frequency VARCHAR(16) NOT NULL DEFAULT 'monthly'
+            )
+            """
+        )
 
     assert "target_amount" not in _columns(eng, "categories")
     assert "target_date" not in _columns(eng, "categories")
+    assert "currency" not in _columns(eng, "transactions")
+    assert "currency" not in _columns(eng, "recurring_schedules")
 
     run_migrations(eng)
     assert "target_amount" in _columns(eng, "categories")
     assert "target_date" in _columns(eng, "categories")
+    assert "currency" in _columns(eng, "transactions")
+    assert "currency" in _columns(eng, "recurring_schedules")

@@ -7,6 +7,35 @@ from app.database import Base
 import app.models  # noqa: F401 — register models with Base.metadata
 
 
+@pytest.fixture(autouse=True)
+def _no_real_fx_refresh(request, monkeypatch):
+    """Block all outbound frankfurter.app calls in tests.
+
+    Patches all three entry points so tests are hermetic: lifespan refresh,
+    eager-fill on transaction insert/CSV import, and manual refresh endpoint.
+    Tests that exercise the real HTTP client (with their own httpx mock) opt
+    out via the ``real_fx_client`` marker.
+    """
+    if "real_fx_client" in request.keywords:
+        return
+
+    from app.services import fx_service
+
+    async def noop_refresh(*args, **kwargs):
+        return (None, 0)
+
+    async def noop_fetch_for_date(target):
+        return {}
+
+    async def noop_fetch_today():
+        from datetime import date as _date
+        return _date.today(), {}
+
+    monkeypatch.setattr(fx_service, "refresh_today", noop_refresh)
+    monkeypatch.setattr(fx_service, "fetch_rates_for_date", noop_fetch_for_date)
+    monkeypatch.setattr(fx_service, "fetch_rates_for_today", noop_fetch_today)
+
+
 @pytest.fixture
 def db_session():
     engine = create_engine(

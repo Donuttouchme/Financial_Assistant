@@ -4,6 +4,7 @@ import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { CategoryDonut } from "@/components/dashboard/CategoryDonut";
 import { MonthlyTrendBar } from "@/components/dashboard/MonthlyTrendBar";
 import { SavingsGoalsRow } from "@/components/dashboard/SavingsGoalsRow";
+import { MissingRatesBanner } from "@/components/dashboard/MissingRatesBanner";
 import { EmptyAppState } from "@/components/EmptyAppState";
 import { useUrlMonth } from "@/hooks/useUrlMonth";
 import { useCategories } from "@/hooks/queries/useCategories";
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-semibold">Dashboard — {monthLabel(month)}</h2>
+      <MissingRatesBanner month={month} />
       <KpiRow month={month} />
       <SavingsGoalsRow month={month} />
       <BudgetWidget month={month} />

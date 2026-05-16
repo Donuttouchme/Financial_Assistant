@@ -23,6 +23,11 @@ export function commitImport(
 ): Promise<ImportCommitResponse> {
   return apiFetch<ImportCommitResponse>("/api/import/commit", {
     method: "POST",
-    body: JSON.stringify({ file_content: fileContent, config, selections }),
+    body: JSON.stringify({
+      file_content: fileContent,
+      config,
+      selections,
+      default_currency: config.default_currency ?? null,
+    }),
   });
 }

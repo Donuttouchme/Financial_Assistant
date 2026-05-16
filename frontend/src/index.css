@@ -4,6 +4,9 @@
 
 @layer base {
   :root {
+    /* Drives browser-native widget rendering: <select> popups,
+       <input type="date"> calendar, scrollbars. Each theme block overrides. */
+    color-scheme: light;
     --background: 0 0% 100%;
     --foreground: 240 10% 4%;
     --card: 0 0% 100%;
@@ -32,6 +35,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 240 10% 4%;
     --foreground: 0 0% 98%;
     --card: 240 10% 4%;
@@ -54,6 +58,7 @@
   }
 
   .sakura {
+    color-scheme: dark;
     --background: 290 30% 8%;
     --foreground: 0 0% 96%;
     --card: 290 25% 12%;
@@ -82,4 +87,78 @@
 
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
+
+  .cyberpunk {
+    color-scheme: dark;
+    /* Palette: near-black bg, neon yellow primary, cyan accent, magenta destructive */
+    --background: 240 15% 6%;
+    --foreground: 60 100% 96%;
+    --card: 240 15% 8%;
+    --card-foreground: 60 100% 96%;
+    --popover: 240 15% 8%;
+    --popover-foreground: 60 100% 96%;
+    --primary: 56 100% 51%;
+    --primary-foreground: 240 15% 6%;
+    --secondary: 240 10% 18%;
+    --secondary-foreground: 60 100% 96%;
+    --muted: 240 10% 14%;
+    --muted-foreground: 60 20% 70%;
+    --accent: 187 100% 50%;
+    --accent-foreground: 240 15% 6%;
+    --destructive: 343 100% 50%;
+    --destructive-foreground: 60 100% 96%;
+    --border: 56 100% 51%;
+    --input: 240 10% 18%;
+    --ring: 56 100% 51%;
+    --radius: 0;
+    --chart-1: 56 100% 51%;
+    --chart-2: 187 100% 50%;
+    --chart-3: 343 100% 50%;
+    --chart-4: 280 100% 65%;
+    --chart-5: 100 100% 50%;
+  }
+
+  /* Geometry overrides — neutralize Tailwind's static rounded utilities */
+  .cyberpunk .rounded,
+  .cyberpunk .rounded-sm,
+  .cyberpunk .rounded-md,
+  .cyberpunk .rounded-lg,
+  .cyberpunk .rounded-xl,
+  .cyberpunk .rounded-2xl,
+  .cyberpunk .rounded-full {
+    border-radius: 0 !important;
+  }
+
+  /* Heavier borders */
+  .cyberpunk * {
+    border-width: 1px;
+  }
+  .cyberpunk .border,
+  .cyberpunk .border-input,
+  .cyberpunk .border-border {
+    border-width: 2px;
+  }
+
+  /* Card notch — angular cut top-right corner */
+  .cyberpunk [data-slot="card"],
+  .cyberpunk .cyberpunk-notch {
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  }
+
+  /* Subtle scanline overlay on body — z-index below Radix portals (z-50)
+     so dialogs, dropdowns, tooltips render above the scanline. */
+  .cyberpunk body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.04) 3px,
+      rgba(0, 0, 0, 0) 4px
+    );
+    z-index: 10;
+  }
 }

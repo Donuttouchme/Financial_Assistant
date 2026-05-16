@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { formatChf } from "@/lib/currency";
+import { formatMoney } from "@/lib/money";
 
 interface Props {
   name: string;
@@ -8,6 +8,7 @@ interface Props {
   target: number | null;
   targetDate: string | null;  // ISO YYYY-MM-DD
   today?: Date;
+  currency?: string;
 }
 
 function daysBetween(from: Date, toIso: string): number {
@@ -15,7 +16,7 @@ function daysBetween(from: Date, toIso: string): number {
   return Math.max(0, Math.round((to.getTime() - from.getTime()) / 86_400_000));
 }
 
-export function SavingsGoalCard({ name, saved, target, targetDate, today }: Props) {
+export function SavingsGoalCard({ name, saved, target, targetDate, today, currency = "CHF" }: Props) {
   const now = today ?? new Date();
   const pct =
     target && target > 0 ? Math.min(100, Math.max(0, (saved / target) * 100)) : null;
@@ -37,10 +38,10 @@ export function SavingsGoalCard({ name, saved, target, targetDate, today }: Prop
           <>
             <div className="flex items-baseline gap-2">
               <span className="text-lg font-semibold tabular-nums">
-                {formatChf(saved)}
+                {formatMoney(saved, currency)}
               </span>
               <span className="text-muted-foreground text-sm">
-                / {formatChf(target)}
+                / {formatMoney(target, currency)}
               </span>
               <span className={`ml-auto text-sm font-medium ${tone}`}>
                 {pct?.toFixed(0)}%
@@ -53,7 +54,7 @@ export function SavingsGoalCard({ name, saved, target, targetDate, today }: Prop
           </>
         ) : (
           <div className="text-sm">
-            <span className="tabular-nums">{formatChf(saved)}</span>{" "}
+            <span className="tabular-nums">{formatMoney(saved, currency)}</span>{" "}
             <span className="text-muted-foreground">saved</span>
           </div>
         )}

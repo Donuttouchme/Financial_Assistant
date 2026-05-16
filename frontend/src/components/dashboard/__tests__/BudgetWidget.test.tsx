@@ -30,11 +30,11 @@ describe("BudgetWidget", () => {
     ];
     testState.transactions = [
       // Dining: 320 spent of 300 limit (over budget, 107%)
-      { id: 100, user_id: 1, amount: "320", date: "2026-05-10", category_id: 1, description: "", is_recurring: false, created_at: "", updated_at: "" },
+      { id: 100, user_id: 1, amount: "320", date: "2026-05-10", category_id: 1, description: "", is_recurring: false, currency: "CHF", base_amount: null, created_at: "", updated_at: "" },
       // Groceries: 380 of 500 (76%)
-      { id: 101, user_id: 1, amount: "380", date: "2026-05-10", category_id: 2, description: "", is_recurring: false, created_at: "", updated_at: "" },
+      { id: 101, user_id: 1, amount: "380", date: "2026-05-10", category_id: 2, description: "", is_recurring: false, currency: "CHF", base_amount: null, created_at: "", updated_at: "" },
       // Transport: 280 of 650 (43%)
-      { id: 102, user_id: 1, amount: "280", date: "2026-05-10", category_id: 3, description: "", is_recurring: false, created_at: "", updated_at: "" },
+      { id: 102, user_id: 1, amount: "280", date: "2026-05-10", category_id: 3, description: "", is_recurring: false, currency: "CHF", base_amount: null, created_at: "", updated_at: "" },
     ];
 
     render(wrap(<BudgetWidget month="2026-05" />));
