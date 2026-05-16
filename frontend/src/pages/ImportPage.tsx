@@ -92,7 +92,6 @@ export default function ImportPage() {
         fileContent,
         { ...config, default_currency: defaultCurrency },
         selections,
-        defaultCurrency,
       );
       toast.success(`Imported ${r.imported}, skipped ${r.skipped}`);
       setRows(null);

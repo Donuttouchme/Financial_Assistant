@@ -23,4 +23,21 @@ describe("AppearanceSection", () => {
     await user.click(screen.getByRole("radio", { name: /cyberpunk/i }));
     expect(document.documentElement.classList.contains("cyberpunk")).toBe(true);
   });
+
+  it("ArrowRight on the focused card moves selection to the next theme", async () => {
+    const user = userEvent.setup();
+    render(<AppearanceSection />);
+    const light = screen.getByRole("radio", { name: /light/i });
+    light.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+  });
+
+  it("only the checked card is in the tab order", () => {
+    render(<AppearanceSection />);
+    const light = screen.getByRole("radio", { name: /light/i });
+    const dark = screen.getByRole("radio", { name: /dark/i });
+    expect(light.getAttribute("tabindex")).toBe("0");
+    expect(dark.getAttribute("tabindex")).toBe("-1");
+  });
 });

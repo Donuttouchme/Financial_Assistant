@@ -139,7 +139,8 @@
     clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
   }
 
-  /* Subtle scanline overlay on body */
+  /* Subtle scanline overlay on body — z-index below Radix portals (z-50)
+     so dialogs, dropdowns, tooltips render above the scanline. */
   .cyberpunk body::before {
     content: "";
     position: fixed;
@@ -152,6 +153,6 @@
       rgba(0, 0, 0, 0.04) 3px,
       rgba(0, 0, 0, 0) 4px
     );
-    z-index: 9999;
+    z-index: 10;
   }
 }

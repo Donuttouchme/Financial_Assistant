@@ -20,7 +20,6 @@ export function commitImport(
   fileContent: string,
   config: CsvImportConfig,
   selections: ImportCommitRowSelection[],
-  defaultCurrency?: string,
 ): Promise<ImportCommitResponse> {
   return apiFetch<ImportCommitResponse>("/api/import/commit", {
     method: "POST",
@@ -28,7 +27,7 @@ export function commitImport(
       file_content: fileContent,
       config,
       selections,
-      default_currency: defaultCurrency ?? null,
+      default_currency: config.default_currency ?? null,
     }),
   });
 }
