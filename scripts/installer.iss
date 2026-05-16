@@ -29,7 +29,8 @@ WizardStyle=modern
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 UninstallDisplayName={#MyAppName}
-UninstallDisplayIcon={app}\RUN.bat
+UninstallDisplayIcon={app}\financial-assistant.ico
+SetupIconFile=financial-assistant.ico
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
@@ -41,12 +42,13 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 
 [Files]
 Source: "..\dist\portable-staging\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "financial-assistant.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\RUN.bat"; IconFilename: "{app}\frontend\dist\favicon.svg"; WorkingDir: "{app}"; Comment: "Open Financial Assistant in your browser"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\RUN.bat"; IconFilename: "{app}\financial-assistant.ico"; WorkingDir: "{app}"; Comment: "Open Financial Assistant in your browser"
 Name: "{group}\Stop {#MyAppName}"; Filename: "{app}\STOP.bat"; WorkingDir: "{app}"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
-Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\RUN.bat"; IconFilename: "{app}\frontend\dist\favicon.svg"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\RUN.bat"; IconFilename: "{app}\financial-assistant.ico"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\RUN.bat"; Description: "Launch {#MyAppName} now"; Flags: postinstall nowait shellexec skipifsilent
