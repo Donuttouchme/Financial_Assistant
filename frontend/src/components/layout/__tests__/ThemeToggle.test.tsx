@@ -4,7 +4,7 @@ import { ThemeToggle } from "../ThemeToggle";
 
 describe("ThemeToggle (3-segment)", () => {
   beforeEach(() => {
-    document.documentElement.classList.remove("dark", "sakura");
+    document.documentElement.classList.remove("dark", "sakura", "cyberpunk");
     window.localStorage.clear();
   });
 
@@ -27,5 +27,10 @@ describe("ThemeToggle (3-segment)", () => {
     fireEvent.click(screen.getByRole("button", { name: /dark theme/i }));
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(document.documentElement.classList.contains("sakura")).toBe(false);
+  });
+
+  it("has a 4th button for cyberpunk", () => {
+    render(<ThemeToggle />);
+    expect(screen.getByLabelText(/cyberpunk theme/i)).toBeInTheDocument();
   });
 });
