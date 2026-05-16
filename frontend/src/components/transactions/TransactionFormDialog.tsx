@@ -15,6 +15,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CurrencySelect } from "@/components/forms/CurrencySelect";
+import { DatePicker } from "@/components/forms/DatePicker";
 import { useCategories } from "@/hooks/queries/useCategories";
 import {
   useCreateTransaction, useUpdateTransaction,
@@ -240,7 +241,13 @@ export function TransactionFormDialog(props: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="tx-date">Date</Label>
-            <Input id="tx-date" type="date" {...form.register("date")} />
+            <DatePicker
+              id="tx-date"
+              value={form.watch("date")}
+              onChange={(v) =>
+                form.setValue("date", v, { shouldValidate: true, shouldDirty: true })
+              }
+            />
             {form.formState.errors.date && (
               <p className="text-sm text-destructive">{form.formState.errors.date.message}</p>
             )}

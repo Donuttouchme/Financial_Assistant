@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/forms/DatePicker";
 import { useCreateCategory } from "@/hooks/queries/useCategories";
 import { parseMoneyInput } from "@/lib/money";
 import { useBaseCurrency } from "@/hooks/queries/useSettings";
@@ -163,10 +164,15 @@ export function CategoryFormDialog({ open, onOpenChange }: Props) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cat-target-date">Target date (optional)</Label>
-                <Input
+                <DatePicker
                   id="cat-target-date"
-                  type="date"
-                  {...form.register("target_date")}
+                  value={form.watch("target_date") ?? ""}
+                  onChange={(v) =>
+                    form.setValue("target_date", v, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
                 />
                 {form.formState.errors.target_date && (
                   <p className="text-sm text-destructive">
