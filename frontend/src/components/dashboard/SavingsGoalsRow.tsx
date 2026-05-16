@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { useTransactions } from "@/hooks/queries/useTransactions";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 import { SavingsGoalCard } from "./SavingsGoalCard";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -13,8 +13,7 @@ export function SavingsGoalsRow({ month: _month }: Props) {
   const { data: cats, isLoading: catsLoading } = useCategories();
   // Cumulative goal progress — fetch ALL savings transactions, not just current month.
   const { data: allTxs, isLoading: txsLoading } = useTransactions({});
-  const { data: settings } = useSettings();
-  const baseCurrency = settings?.base_currency ?? "CHF";
+  const baseCurrency = useBaseCurrency();
 
   const cards = useMemo(() => {
     if (!cats || !allTxs) return [];

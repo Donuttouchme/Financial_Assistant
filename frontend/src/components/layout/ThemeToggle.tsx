@@ -1,10 +1,9 @@
 import { Moon, Sun, Flower2, Zap } from "lucide-react";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme, type Theme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 
-type ThemeName = "light" | "dark" | "sakura" | "cyberpunk";
 const OPTIONS: Array<{
-  key: ThemeName;
+  key: Theme;
   label: string;
   Icon: React.ComponentType<{ className?: string }>;
 }> = [

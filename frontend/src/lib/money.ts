@@ -90,6 +90,10 @@ export function formatMoney(value: string | number, currency: string): string {
 export function parseMoneyInput(raw: string): string {
   // Strip thousand separators: apostrophe (U+0027), right single quote (U+2019),
   // non-breaking space (U+00A0), narrow no-break space (U+202F), regular whitespace.
+  // Expects "." as the decimal separator (HTML <input type="number"> always
+  // produces this regardless of user locale). Comma-as-decimal input like
+  // "1234,56" is rejected by the regex; if we ever accept free-text amount
+  // entry we'll need to handle that explicitly.
   const cleaned = raw.replace(/['’  \s]/g, "");
   if (!/^-?\d+(\.\d+)?$/.test(cleaned)) {
     throw new Error(`parseMoneyInput: not numeric: ${raw}`);

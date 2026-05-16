@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { useBudgetsForMonth, useSetBudget } from "@/hooks/queries/useBudgets";
 import { formatMoney, parseMoneyInput } from "@/lib/money";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 import { cn } from "@/lib/utils";
 
 interface Props { month: string }
@@ -33,8 +33,7 @@ export function BudgetsTable({ month }: Props) {
   const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: budgets, isLoading: budgetsLoading } = useBudgetsForMonth(month);
   const setBudget = useSetBudget();
-  const { data: settings } = useSettings();
-  const baseCurrency = settings?.base_currency ?? "CHF";
+  const baseCurrency = useBaseCurrency();
 
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");

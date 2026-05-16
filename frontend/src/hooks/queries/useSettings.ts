@@ -13,6 +13,12 @@ export function useSettings() {
   return useQuery({ queryKey: KEY, queryFn: getSettings });
 }
 
+/** The current base currency, or "CHF" while settings are loading. */
+export function useBaseCurrency(): string {
+  const { data } = useSettings();
+  return data?.base_currency ?? "CHF";
+}
+
 export function useUpdateBaseCurrency() {
   const qc = useQueryClient();
   return useMutation({

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { useCreateCategory } from "@/hooks/queries/useCategories";
 import { parseMoneyInput } from "@/lib/money";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 
 const schema = z
   .object({
@@ -67,8 +67,7 @@ interface Props {
 
 export function CategoryFormDialog({ open, onOpenChange }: Props) {
   const create = useCreateCategory();
-  const { data: settings } = useSettings();
-  const baseCurrency = settings?.base_currency ?? "CHF";
+  const baseCurrency = useBaseCurrency();
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { name: "", kind: "expense", target_amount: "", target_date: "" },

@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBudgetsForMonth } from "@/hooks/queries/useBudgets";
 import { formatMoney } from "@/lib/money";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 import { monthLabel } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
@@ -25,8 +25,7 @@ function progressColor(pct: number): string {
 
 export function BudgetWidget({ month }: Props) {
   const { data, isLoading } = useBudgetsForMonth(month);
-  const { data: settings } = useSettings();
-  const baseCurrency = settings?.base_currency ?? "CHF";
+  const baseCurrency = useBaseCurrency();
 
   const rows = useMemo(() => {
     return (data ?? [])

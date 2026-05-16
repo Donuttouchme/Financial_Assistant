@@ -9,7 +9,7 @@ import {
 import { useTransactions } from "@/hooks/queries/useTransactions";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { formatMoney } from "@/lib/money";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 
 interface Props { month: string }
 
@@ -30,8 +30,7 @@ const PALETTE = [
 export function CategoryDonut({ month }: Props) {
   const { data: txs, isLoading: txsLoading } = useTransactions({ month });
   const { data: cats, isLoading: catsLoading } = useCategories();
-  const { data: settings } = useSettings();
-  const baseCurrency = settings?.base_currency ?? "CHF";
+  const baseCurrency = useBaseCurrency();
 
   const slices: Slice[] = useMemo(() => {
     if (!txs || !cats) return [];

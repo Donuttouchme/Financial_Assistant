@@ -194,10 +194,12 @@ function ColumnInput({
   value: number;
   onChange: (n: number) => void;
 }) {
+  const id = `col-${label.toLowerCase().replace(/\s+/g, "-")}`;
   return (
     <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label htmlFor={id} className="text-xs text-muted-foreground">{label}</Label>
       <Input
+        id={id}
         type="number"
         min={0}
         value={value}

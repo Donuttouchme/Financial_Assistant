@@ -19,7 +19,7 @@ import { useCategories } from "@/hooks/queries/useCategories";
 import {
   useCreateTransaction, useUpdateTransaction,
 } from "@/hooks/queries/useTransactions";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 import { isSupportedCurrency } from "@/lib/currencies";
 import type { SupportedCurrency } from "@/lib/currencies";
 import { parseMoneyInput } from "@/lib/money";
@@ -69,10 +69,9 @@ export function TransactionFormDialog(props: Props) {
   const isEdit = props.mode === "edit";
 
   const { data: categories } = useCategories();
-  const { data: settings } = useSettings();
   const create = useCreateTransaction();
   const update = useUpdateTransaction();
-  const baseCurrency = (settings?.base_currency ?? "CHF") as SupportedCurrency;
+  const baseCurrency = useBaseCurrency() as SupportedCurrency;
 
   const [savedFlash, setSavedFlash] = useState(false);
 

@@ -16,7 +16,7 @@ import {
   useTransactions, useDeleteTransaction,
 } from "@/hooks/queries/useTransactions";
 import { useCategories } from "@/hooks/queries/useCategories";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 import { formatMoney } from "@/lib/money";
 import type { Transaction } from "@/api/types";
 
@@ -31,8 +31,7 @@ export function TransactionsTable({ month, categoryId }: Props) {
     category_id: categoryId,
   });
   const { data: cats } = useCategories();
-  const { data: settings } = useSettings();
-  const baseCurrency = settings?.base_currency ?? "CHF";
+  const baseCurrency = useBaseCurrency();
   const del = useDeleteTransaction();
 
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -87,16 +86,18 @@ export function TransactionsTable({ month, categoryId }: Props) {
               <TableCell className="text-right tabular-nums">
                 <div>{formatMoney(t.amount, t.currency)}</div>
                 {t.currency !== baseCurrency && (
-                  <div
-                    className="text-xs text-muted-foreground"
-                    title={
-                      t.base_amount === null
-                        ? "FX rate unavailable — refresh rates in Settings"
-                        : ""
-                    }
-                  >
-                    ≈ {t.base_amount === null ? "—" : formatMoney(t.base_amount, baseCurrency)}
-                  </div>
+                  t.base_amount === null ? (
+                    <div
+                      className="text-xs text-muted-foreground"
+                      title="FX rate unavailable — refresh rates in Settings"
+                    >
+                      ≈ —
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">
+                      ≈ {formatMoney(t.base_amount, baseCurrency)}
+                    </div>
+                  )
                 )}
               </TableCell>
               <TableCell className="text-right">

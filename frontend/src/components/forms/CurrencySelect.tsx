@@ -1,19 +1,10 @@
 import { CURRENCY_SYMBOLS } from "@/lib/money";
-import { MOST_USED, SUPPORTED_CURRENCIES } from "@/lib/currencies";
-
-const CURRENCY_NAMES: Record<string, string> = {
-  AUD: "Australian Dollar", BGN: "Bulgarian Lev", BRL: "Brazilian Real",
-  CAD: "Canadian Dollar", CHF: "Swiss Franc", CNY: "Chinese Yuan",
-  CZK: "Czech Koruna", DKK: "Danish Krone", EUR: "Euro",
-  GBP: "Pound Sterling", HKD: "Hong Kong Dollar", HUF: "Hungarian Forint",
-  IDR: "Indonesian Rupiah", ILS: "Israeli Shekel", INR: "Indian Rupee",
-  ISK: "Icelandic Króna", JPY: "Japanese Yen", KRW: "South Korean Won",
-  MXN: "Mexican Peso", MYR: "Malaysian Ringgit", NOK: "Norwegian Krone",
-  NZD: "New Zealand Dollar", PHP: "Philippine Peso", PLN: "Polish Zloty",
-  RON: "Romanian Leu", SEK: "Swedish Krona", SGD: "Singapore Dollar",
-  THB: "Thai Baht", TRY: "Turkish Lira", USD: "US Dollar",
-  ZAR: "South African Rand",
-};
+import {
+  CURRENCY_NAMES,
+  MOST_USED,
+  SUPPORTED_CURRENCIES,
+  isSupportedCurrency,
+} from "@/lib/currencies";
 
 const OTHER_CURRENCIES = [...SUPPORTED_CURRENCIES]
   .filter((c) => !(MOST_USED as readonly string[]).includes(c))
@@ -30,7 +21,7 @@ interface Props {
 
 function row(code: string): string {
   const symbol = CURRENCY_SYMBOLS[code] ?? code;
-  const name = CURRENCY_NAMES[code] ?? code;
+  const name = isSupportedCurrency(code) ? CURRENCY_NAMES[code] : code;
   return `${symbol}  ${code}  ${name}`;
 }
 

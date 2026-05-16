@@ -3,15 +3,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTransactions } from "@/hooks/queries/useTransactions";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { formatMoney } from "@/lib/money";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 
 interface Props { month: string; limit?: number }
 
 export function RecentTransactions({ month, limit = 5 }: Props) {
   const { data: txs, isLoading: txsLoading } = useTransactions({ month });
   const { data: cats, isLoading: catsLoading } = useCategories();
-  const { data: settings } = useSettings();
-  const baseCurrency = settings?.base_currency ?? "CHF";
+  const baseCurrency = useBaseCurrency();
 
   const catName = (id: number) =>
     cats?.find((c) => c.id === id)?.name ?? `#${id}`;

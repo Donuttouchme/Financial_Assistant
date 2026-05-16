@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { CurrencySelect } from "@/components/forms/CurrencySelect";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 import { BaseCurrencyChangeDialog } from "./BaseCurrencyChangeDialog";
 
 export function CurrencySection() {
-  const { data: settings } = useSettings();
-  const current = settings?.base_currency ?? "CHF";
+  const current = useBaseCurrency();
   const [draft, setDraft] = useState<string>(current);
   const [dialogOpen, setDialogOpen] = useState(false);
 

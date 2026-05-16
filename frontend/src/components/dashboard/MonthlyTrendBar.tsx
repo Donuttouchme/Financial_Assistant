@@ -10,7 +10,7 @@ import { listTransactions } from "@/api/transactions";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { format, parse, subMonths } from "date-fns";
 import { formatMoney } from "@/lib/money";
-import { useSettings } from "@/hooks/queries/useSettings";
+import { useBaseCurrency } from "@/hooks/queries/useSettings";
 
 interface Props { month: string }
 
@@ -32,8 +32,7 @@ export function MonthlyTrendBar({ month }: Props) {
     })),
   });
   const { data: cats, isLoading: catsLoading } = useCategories();
-  const { data: settings } = useSettings();
-  const baseCurrency = settings?.base_currency ?? "CHF";
+  const baseCurrency = useBaseCurrency();
 
   const isLoading = catsLoading || queries.some((q) => q.isLoading);
 
