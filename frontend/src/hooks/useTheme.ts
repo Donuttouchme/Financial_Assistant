@@ -37,14 +37,14 @@ function applyFavicon(theme: Theme): void {
 }
 
 function readInitialTheme(): Theme {
+  // First-run default is always light. The user's choice is persisted in
+  // localStorage and takes precedence on subsequent loads. We deliberately
+  // do NOT honor prefers-color-scheme here — it conflicts with users who
+  // run their OS in dark mode but still want this app to start light.
   if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored && (VALID as string[]).includes(stored)) return stored as Theme;
-  try {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  } catch {
-    return "light";
-  }
+  return "light";
 }
 
 export function useTheme() {
