@@ -18,8 +18,12 @@ from sqlalchemy.orm import Session
 
 from app.models.fx_rate import FxRate
 
-FRANKFURTER_BASE_URL = "https://api.frankfurter.app"
+FRANKFURTER_BASE_URL = "https://api.frankfurter.dev/v1"
 _HTTP_TIMEOUT_SECONDS = 8.0
+# httpx does not follow redirects by default. frankfurter.app retired and
+# 301's to frankfurter.dev/v1; we target the new URL directly but keep this
+# on as belt-and-suspenders in case the API is moved again.
+_FOLLOW_REDIRECTS = True
 
 
 class FxFetchError(RuntimeError):
@@ -38,7 +42,9 @@ async def fetch_rates_for_date(target: date) -> dict[str, Decimal]:
     iso = target.isoformat()
     url = f"{FRANKFURTER_BASE_URL}/{iso}"
     try:
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(
+            timeout=_HTTP_TIMEOUT_SECONDS, follow_redirects=_FOLLOW_REDIRECTS
+        ) as client:
             response = await client.get(url)
     except httpx.HTTPError as exc:
         raise FxFetchError(f"frankfurter.app request failed for {iso}: {exc}") from exc
@@ -58,7 +64,9 @@ async def fetch_rates_for_today() -> tuple[date, dict[str, Decimal]]:
     """
     url = f"{FRANKFURTER_BASE_URL}/latest"
     try:
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(
+            timeout=_HTTP_TIMEOUT_SECONDS, follow_redirects=_FOLLOW_REDIRECTS
+        ) as client:
             response = await client.get(url)
     except httpx.HTTPError as exc:
         raise FxFetchError(f"frankfurter.app request failed for latest: {exc}") from exc
