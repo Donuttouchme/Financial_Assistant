@@ -7,7 +7,7 @@ def test_fx_status_empty(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["latest_date"] is None
-    assert body["source"] == "frankfurter.app"
+    assert body["source"] == "frankfurter.dev"
     assert body["is_fresh"] is False
 
 

@@ -15,7 +15,7 @@ def fx_status(db: Session = Depends(get_db)):
     latest = fx_service.get_latest_date(db)
     return FxStatusRead(
         latest_date=latest,
-        source="frankfurter.app",
+        source="frankfurter.dev",
         is_fresh=(latest is not None and latest >= date.today()),
     )
 

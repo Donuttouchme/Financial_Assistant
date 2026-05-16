@@ -17,7 +17,7 @@ export const testState = {
   budgets: [] as BudgetRead[],
   importPresets: [] as ImportPreset[],
   settings: { base_currency: "CHF" } as SettingsRead,
-  fxStatus: { latest_date: null, source: "frankfurter.app", is_fresh: false } as FxStatusRead,
+  fxStatus: { latest_date: null, source: "frankfurter.dev", is_fresh: false } as FxStatusRead,
   nextCatId: 1,
   nextTxId: 1,
   nextPresetId: 1,
@@ -29,7 +29,7 @@ export function resetTestState() {
   testState.budgets = [];
   testState.importPresets = [];
   testState.settings = { base_currency: "CHF" };
-  testState.fxStatus = { latest_date: null, source: "frankfurter.app", is_fresh: false };
+  testState.fxStatus = { latest_date: null, source: "frankfurter.dev", is_fresh: false };
   testState.nextCatId = 1;
   testState.nextTxId = 1;
   testState.nextPresetId = 1;
@@ -242,7 +242,7 @@ export const handlers = [
 
   http.post("/api/fx/refresh", () => {
     const today = new Date().toISOString().slice(0, 10);
-    testState.fxStatus = { latest_date: today, source: "frankfurter.app", is_fresh: true };
+    testState.fxStatus = { latest_date: today, source: "frankfurter.dev", is_fresh: true };
     return HttpResponse.json<FxRefreshResponse>({
       fetched_date: today,
       currencies_updated: 31,

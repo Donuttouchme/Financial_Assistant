@@ -22,7 +22,7 @@ describe("FxSection", () => {
 
   it("shows the latest date when present", async () => {
     const today = new Date().toISOString().slice(0, 10);
-    testState.fxStatus = { latest_date: today, source: "frankfurter.app", is_fresh: true };
+    testState.fxStatus = { latest_date: today, source: "frankfurter.dev", is_fresh: true };
     render(wrap(<FxSection />));
     await waitFor(() => {
       expect(screen.getByText(new RegExp(today))).toBeInTheDocument();

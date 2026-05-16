@@ -56,7 +56,7 @@ export function FxSection() {
         {refresh.isPending ? "Refreshing…" : "Refresh rates now"}
       </Button>
       <p className="text-xs text-muted-foreground">
-        Source: frankfurter.app (European Central Bank reference rates).
+        Source: frankfurter.dev (European Central Bank reference rates).
         ECB publishes rates once per business day around 16:00 CET.
       </p>
     </div>
