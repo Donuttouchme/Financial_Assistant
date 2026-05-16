@@ -4,6 +4,9 @@
 
 @layer base {
   :root {
+    /* Drives browser-native widget rendering: <select> popups,
+       <input type="date"> calendar, scrollbars. Each theme block overrides. */
+    color-scheme: light;
     --background: 0 0% 100%;
     --foreground: 240 10% 4%;
     --card: 0 0% 100%;
@@ -32,6 +35,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 240 10% 4%;
     --foreground: 0 0% 98%;
     --card: 240 10% 4%;
@@ -54,6 +58,7 @@
   }
 
   .sakura {
+    color-scheme: dark;
     --background: 290 30% 8%;
     --foreground: 0 0% 96%;
     --card: 290 25% 12%;
@@ -84,6 +89,7 @@
   body { @apply bg-background text-foreground; }
 
   .cyberpunk {
+    color-scheme: dark;
     /* Palette: near-black bg, neon yellow primary, cyan accent, magenta destructive */
     --background: 240 15% 6%;
     --foreground: 60 100% 96%;

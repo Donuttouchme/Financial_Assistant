@@ -27,7 +27,7 @@ export function EmptyAppState() {
             <Button
               type="button"
               variant="secondary"
-              disabled={draft === settings?.base_currency || update.isPending}
+              disabled={update.isPending}
               onClick={() => update.mutate(draft)}
             >
               Save currency
