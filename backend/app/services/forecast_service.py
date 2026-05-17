@@ -6,16 +6,10 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.models.category import Category
-from app.models.fx_rate import FxRate
 from app.models.transaction import Transaction
 from app.schemas.forecast import DailyCumulativeResponse, DailyPoint, MonthlyBucketsResponse, MonthlyPoint
 from app.services import settings_service
 from app.services.transaction_service import _compute_base_amount, _load_rates_for
-
-# FxRate rows pivot on EUR (rate_to_eur). Forecast totals are expressed in EUR
-# so that _compute_base_amount can do the conversion without requiring the user's
-# chosen base currency to have a matching rate row in the test DB.
-_BASE_CURRENCY = "EUR"
 
 
 def _month_bounds(month: str) -> tuple[date, date]:
@@ -31,15 +25,19 @@ def actual_mtd(
     user_id: int,
     month: str,
     through: date,
+    base_currency: str,
     category_id: int | None = None,
 ) -> dict[date, Decimal]:
-    """Cumulative expense in EUR, day 1 of `month` through `through`.
+    """Cumulative expense in `base_currency`, day 1 of `month` through `through`.
 
-    Returns one entry per day in [first_of_month, through], expressed as EUR
-    Decimal (the FxRate pivot currency). Income categories are excluded.
-    If `category_id` is supplied, only that category's transactions are summed.
-    Foreign-currency transactions are converted via the same FX pipeline used
-    by `transaction_service.enrich_with_base_amount`.
+    Same-currency transactions are summed directly with no FX lookup — this is
+    what `_compute_base_amount` does when `currency == base_currency`. Foreign-
+    currency transactions need rate rows for both the tx currency AND the base
+    on the tx date; missing rates → that single transaction is skipped. The
+    forecast intentionally accounts in the user's chosen base currency rather
+    than routing through EUR, because old transaction dates frequently lack FX
+    rows and an EUR pivot would force them all through CHF→EUR→CHF and drop
+    every single one.
     """
     first, _ = _month_bounds(month)
     if through < first:
@@ -62,7 +60,7 @@ def actual_mtd(
 
     rows = list(db.execute(stmt).scalars().all())
 
-    currencies = {t.currency for t in rows} | {_BASE_CURRENCY}
+    currencies = {t.currency for t in rows} | {base_currency}
     dates = {t.date for t in rows}
     rates = _load_rates_for(db, currencies, dates)
 
@@ -72,13 +70,12 @@ def actual_mtd(
             amount=t.amount,
             currency=t.currency,
             when=t.date,
-            base_currency=_BASE_CURRENCY,
+            base_currency=base_currency,
             rate_for=rates,
         )
         if base_amount is None:
-            # Missing FX rate — treat as zero rather than blowing up. Matches
-            # the spirit of `enrich_with_base_amount` which surfaces None to
-            # the API; here we sum, so None means "can't include".
+            # Missing FX rate for a cross-currency tx — skip. Same-currency tx
+            # never hit this branch (the helper shortcuts before any lookup).
             continue
         per_day[t.date] = per_day.get(t.date, Decimal(0)) + base_amount
 
@@ -112,6 +109,7 @@ def day_of_month_profile(
     user_id: int,
     category_id: int,
     as_of: date,
+    base_currency: str,
 ) -> list[Decimal]:
     """Normalised 31-element distribution of how this category's expense
     spreads across days-of-month, averaged over the trailing 6 months ending
@@ -121,8 +119,9 @@ def day_of_month_profile(
     Returns a flat 1/31 distribution when the category has no expense history
     in the window (cold-start fallback).
 
-    Amounts are converted to EUR via the FxRate pivot before being binned.
-    Missing FX rates are skipped (consistent with `actual_mtd`).
+    Amounts are converted to `base_currency` via `_compute_base_amount`. Same-
+    currency transactions skip FX entirely; cross-currency transactions whose
+    date lacks an FX row are skipped.
     """
     window_start = _months_ago(as_of, _PROFILE_TRAILING_MONTHS)
     window_end = as_of - timedelta(days=1)
@@ -142,7 +141,7 @@ def day_of_month_profile(
     )
     rows = list(db.execute(stmt).scalars().all())
 
-    currencies = {t.currency for t in rows} | {_BASE_CURRENCY}
+    currencies = {t.currency for t in rows} | {base_currency}
     dates = {t.date for t in rows}
     rates = _load_rates_for(db, currencies, dates)
 
@@ -152,7 +151,7 @@ def day_of_month_profile(
             amount=t.amount,
             currency=t.currency,
             when=t.date,
-            base_currency=_BASE_CURRENCY,
+            base_currency=base_currency,
             rate_for=rates,
         )
         if base_amount is None:
@@ -187,11 +186,12 @@ def projected_monthly_total(
     user_id: int,
     category_id: int,
     as_of: date,
+    base_currency: str,
 ) -> Decimal:
-    """Project this category's monthly spend (in EUR) from the trailing 90
-    days ending the day before `as_of`. Includes recurring AND ad-hoc — the
-    day-of-month profile handles intra-month timing separately, so there is
-    no need to disambiguate.
+    """Project this category's monthly spend (in `base_currency`) from the
+    trailing 90 days ending the day before `as_of`. Includes recurring AND
+    ad-hoc — the day-of-month profile handles intra-month timing separately,
+    so there is no need to disambiguate.
 
     Returns 0 when the category has no history in the window.
     """
@@ -215,7 +215,7 @@ def projected_monthly_total(
     if not rows:
         return Decimal(0)
 
-    currencies = {t.currency for t in rows} | {_BASE_CURRENCY}
+    currencies = {t.currency for t in rows} | {base_currency}
     dates = {t.date for t in rows}
     rates = _load_rates_for(db, currencies, dates)
 
@@ -225,7 +225,7 @@ def projected_monthly_total(
             amount=t.amount,
             currency=t.currency,
             when=t.date,
-            base_currency=_BASE_CURRENCY,
+            base_currency=base_currency,
             rate_for=rates,
         )
         if base_amount is None:
@@ -273,29 +273,6 @@ def forecast_available(db: Session, *, user_id: int, as_of: date) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Step 6.2 – base-currency conversion helper
-# ---------------------------------------------------------------------------
-
-def _eur_to_base_factor(db: Session, *, base_currency: str, on: date) -> Decimal | None:
-    """Return the factor F such that `base_amount = eur_amount * F` on date `on`.
-
-    rate_to_eur(X) stores "1 EUR = X currency-units" (frankfurter convention),
-    so the EUR -> base factor IS rate_to_eur(base). For EUR base, returns 1.0.
-    Returns None when no rate row exists for (base, on).
-    """
-    if base_currency == "EUR":
-        return Decimal("1")
-    rate = db.execute(
-        select(FxRate.rate_to_eur).where(
-            FxRate.currency == base_currency, FxRate.date == on
-        )
-    ).scalar_one_or_none()
-    if rate is None:
-        return None
-    return rate
-
-
-# ---------------------------------------------------------------------------
 # Step 6.3 – daily_cumulative composition
 # ---------------------------------------------------------------------------
 
@@ -318,22 +295,22 @@ def daily_cumulative(
     no trailing data — together they produce a sensible-but-quiet forecast
     on day 1 that sharpens as data accumulates.
 
-    Internal math is in EUR; the response is converted to the user's chosen
-    base currency using FX rates on `today` (single factor applied to all
-    points for visual consistency across the chart).
+    All math is in the user's chosen base currency; no intermediate EUR
+    pivot. Same-currency transactions need no FX rows at all.
     """
     first, last = _month_bounds(month)
     base_currency = settings_service.get_settings(db).base_currency
 
     mtd_end = min(today, last)
-    actuals_eur = actual_mtd(
-        db, user_id=user_id, month=month, through=mtd_end, category_id=category_id,
+    actuals = actual_mtd(
+        db, user_id=user_id, month=month, through=mtd_end,
+        base_currency=base_currency, category_id=category_id,
     )
 
     has_any_history = forecast_available(db, user_id=user_id, as_of=today)
 
-    # Build per-day forecast contributions (in EUR) for days after today.
-    future_per_day_eur: dict[date, Decimal] = {}
+    # Build per-day forecast contributions for days after today.
+    future_per_day: dict[date, Decimal] = {}
     if today < last:
         cat_stmt = select(Category).where(
             Category.user_id == user_id, Category.kind == "expense",
@@ -343,11 +320,13 @@ def daily_cumulative(
         for cat in db.execute(cat_stmt).scalars().all():
             projected = projected_monthly_total(
                 db, user_id=user_id, category_id=cat.id, as_of=today,
+                base_currency=base_currency,
             )
             if projected <= 0:
                 continue
             profile = day_of_month_profile(
                 db, user_id=user_id, category_id=cat.id, as_of=today,
+                base_currency=base_currency,
             )
 
             remaining_days = list(range(today.day + 1, last.day + 1))
@@ -359,30 +338,21 @@ def daily_cumulative(
             for d in remaining_days:
                 share = projected * (profile[d - 1] / wsum)
                 day_obj = date(first.year, first.month, d)
-                future_per_day_eur[day_obj] = (
-                    future_per_day_eur.get(day_obj, Decimal(0)) + share
+                future_per_day[day_obj] = (
+                    future_per_day.get(day_obj, Decimal(0)) + share
                 )
 
-    # Convert EUR running totals to base currency.
-    factor = _eur_to_base_factor(db, base_currency=base_currency, on=today)
-    if factor is None:
-        # FX rate for base unavailable on `today` — fall through with EUR
-        # values labelled as base. The response's base_currency field still
-        # reflects user choice, but values may be off by a small amount until
-        # rates land. This mirrors the surface UX in the rest of the app.
-        factor = Decimal("1")
-
     points: list[DailyPoint] = []
-    running_eur = Decimal(0)
+    running = Decimal(0)
     d = first
     while d <= last:
         if d <= mtd_end:
-            running_eur = actuals_eur.get(d, running_eur)
+            running = actuals.get(d, running)
             is_fc = False
         else:
-            running_eur += future_per_day_eur.get(d, Decimal(0))
+            running += future_per_day.get(d, Decimal(0))
             is_fc = True
-        cumulative = (running_eur * factor).quantize(Decimal("0.01"))
+        cumulative = running.quantize(Decimal("0.01"))
         points.append(DailyPoint(date=d, cumulative=cumulative, is_forecast=is_fc))
         d += timedelta(days=1)
 
@@ -430,10 +400,11 @@ def _split_forward(horizon_months: int) -> tuple[int, int]:
     return (0, horizon_months - 1)
 
 
-def _monthly_actual_total_eur(
-    db: Session, *, user_id: int, month: str, category_id: int | None,
+def _monthly_actual_total(
+    db: Session, *, user_id: int, month: str, base_currency: str,
+    category_id: int | None,
 ) -> Decimal:
-    """Sum expense over a calendar month in EUR (FX-converted)."""
+    """Sum expense over a calendar month, expressed in `base_currency`."""
     first, last = _month_bounds(month)
     stmt = (
         select(Transaction)
@@ -451,7 +422,7 @@ def _monthly_actual_total_eur(
         stmt = stmt.where(Transaction.category_id == category_id)
     rows = list(db.execute(stmt).scalars().all())
 
-    currencies = {t.currency for t in rows} | {_BASE_CURRENCY}
+    currencies = {t.currency for t in rows} | {base_currency}
     dates = {t.date for t in rows}
     rates = _load_rates_for(db, currencies, dates)
 
@@ -461,7 +432,7 @@ def _monthly_actual_total_eur(
             amount=t.amount,
             currency=t.currency,
             when=t.date,
-            base_currency=_BASE_CURRENCY,
+            base_currency=base_currency,
             rate_for=rates,
         )
         if base_amount is None:
@@ -470,11 +441,12 @@ def _monthly_actual_total_eur(
     return total
 
 
-def _future_month_total_eur(
-    db: Session, *, user_id: int, today: date, category_id: int | None,
+def _future_month_total(
+    db: Session, *, user_id: int, today: date, base_currency: str,
+    category_id: int | None,
 ) -> Decimal:
-    """Projected total spend for a single future month in EUR — per-category
-    projected monthly totals summed."""
+    """Projected total spend for a single future month in `base_currency` —
+    per-category projected monthly totals summed."""
     cat_stmt = select(Category).where(
         Category.user_id == user_id, Category.kind == "expense",
     )
@@ -484,6 +456,7 @@ def _future_month_total_eur(
     for cat in db.execute(cat_stmt).scalars().all():
         total += projected_monthly_total(
             db, user_id=user_id, category_id=cat.id, as_of=today,
+            base_currency=base_currency,
         )
     return total
 
@@ -499,8 +472,8 @@ def monthly_buckets(
 ) -> MonthlyBucketsResponse:
     """One bucket per month over `horizon`. Past months are actual totals;
     future months are forecast totals; current month is split into actual MTD
-    + forecast remainder. EUR internally; converted to user's base currency
-    at response boundary."""
+    + forecast remainder. All totals in the user's chosen base currency; no
+    intermediate EUR pivot."""
     if horizon not in _HORIZON_MONTHS:
         raise ValueError(f"unknown horizon: {horizon!r}")
     if mode not in ("centered", "forward"):
@@ -520,18 +493,18 @@ def monthly_buckets(
     )
 
     base_currency = settings_service.get_settings(db).base_currency
-    factor = _eur_to_base_factor(db, base_currency=base_currency, on=today) or Decimal("1")
     has_any_history = forecast_available(db, user_id=user_id, as_of=today)
 
     points: list[MonthlyPoint] = []
     for label in labels:
         if label < current_label:
-            total_eur = _monthly_actual_total_eur(
-                db, user_id=user_id, month=label, category_id=category_id,
+            total = _monthly_actual_total(
+                db, user_id=user_id, month=label,
+                base_currency=base_currency, category_id=category_id,
             )
             points.append(MonthlyPoint(
                 month=label,
-                total=(total_eur * factor).quantize(Decimal("0.01")),
+                total=total.quantize(Decimal("0.01")),
                 kind="past",
             ))
         elif label == current_label:
@@ -554,12 +527,13 @@ def monthly_buckets(
             # Always project — `projected_monthly_total` returns 0 when no
             # history exists, so the bar will be zero-height rather than
             # absent. This keeps the chart shape continuous from day 1.
-            future_eur = _future_month_total_eur(
-                db, user_id=user_id, today=today, category_id=category_id,
+            future = _future_month_total(
+                db, user_id=user_id, today=today,
+                base_currency=base_currency, category_id=category_id,
             )
             points.append(MonthlyPoint(
                 month=label,
-                total=(future_eur * factor).quantize(Decimal("0.01")),
+                total=future.quantize(Decimal("0.01")),
                 kind="future",
             ))
 
