@@ -2,7 +2,22 @@
 
 A local-first personal finance tracker. Multi-currency, theme-aware, single-user. Ships as a one-click Windows installer; runs entirely on your machine — no accounts, no cloud, no telemetry.
 
-**Latest release:** [v1.1.0](https://github.com/Donuttouchme/Financial_Assistant/releases/latest) — multi-currency support, Settings page, four themes.
+**Latest release:** [v1.2.0](https://github.com/Donuttouchme/Financial_Assistant/releases/latest) — forecast graph, per-category drill-down, two new themes.
+
+---
+
+## What's new in v1.2.0
+
+- **Forecast graph.** The dashboard now shows a cumulative month-to-date expense curve with a translucent forecast tail through the end of the current month. A new **Forecast** page (sidebar) lets you change horizon (1m / 3m / 6m / 1y / 2y) and switch between "centered on today" and "forecast only" views.
+- **Per-category drill-down.** Filter the forecast by category from a dropdown on both the dashboard widget and the Forecast page. The selection is bookmarkable via `?category=` in the URL.
+- **Two new themes.** **Emerald-dark** (forest-at-midnight, softer corners, faint film grain) and **Navy-light** (classic-banker, crisper corners, faint pinstripe). Switch from Settings → Appearance.
+
+### Upgrade notes
+- No schema migrations. The forecast feature reads existing transactions only.
+- The previous "Last 6 months" bar chart on the dashboard has been replaced by the new forecast widget. The same monthly-bar view is available on the new Forecast page at horizon = 6m (with a forecast tail).
+
+### Known limitations
+- Forecast accuracy needs at least 30 days of expense data before any forecast tail appears, and at least 60 days before the per-category day-of-month profile kicks in. Below those thresholds, the chart shows what it can with a footer hint.
 
 ---
 
@@ -25,7 +40,7 @@ A local-first personal finance tracker. Multi-currency, theme-aware, single-user
 Download the latest installer from the [releases page](https://github.com/Donuttouchme/Financial_Assistant/releases/latest) and run it:
 
 ```
-Financial-Assistant-Setup-v1.1.0.exe
+Financial-Assistant-Setup-v1.2.0.exe
 ```
 
 The installer is unsigned, so SmartScreen will warn on first run — click "More info" → "Run anyway". Install location defaults to `%LOCALAPPDATA%\Programs\FinancialAssistant`. A Start Menu shortcut is created automatically; tick the optional checkbox during install if you want a Desktop icon as well.
@@ -78,10 +93,10 @@ Starts FastAPI on `:8000` and Vite on `:3000` in one terminal, color-coded. Open
 ### Production build + installer
 
 ```powershell
-.\scripts\package.ps1 -Version "1.1.0"
+.\scripts\package.ps1 -Version "1.2.0"
 ```
 
-Runs the frontend production build, downloads the Python 3.14 embeddable distribution (cached after the first run), installs backend dependencies into it, and compiles the Inno Setup script. The resulting installer lands at `dist\Financial-Assistant-Setup-v1.1.0.exe` (~23 MB).
+Runs the frontend production build, downloads the Python 3.14 embeddable distribution (cached after the first run), installs backend dependencies into it, and compiles the Inno Setup script. The resulting installer lands at `dist\Financial-Assistant-Setup-v1.2.0.exe` (~23 MB).
 
 ### Updating the logo / installer icon
 
