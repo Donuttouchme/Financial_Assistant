@@ -35,6 +35,57 @@ export function resetTestState() {
   testState.nextPresetId = 1;
 }
 
+function fakeDailyMay2026() {
+  const points = [];
+  for (let day = 1; day <= 31; day++) {
+    const dateStr = `2026-05-${String(day).padStart(2, "0")}`;
+    points.push({
+      date: dateStr,
+      cumulative: String(day * 10),
+      is_forecast: day > 16,
+    });
+  }
+  return {
+    month: "2026-05",
+    base_currency: "EUR",
+    today: "2026-05-16",
+    forecast_available: true,
+    points,
+  };
+}
+
+const forecastHandlers = [
+  http.get("/api/forecast/daily-cumulative", ({ request }) => {
+    const url = new URL(request.url);
+    const month = url.searchParams.get("month") ?? "2026-05";
+    if (month === "2026-05") return HttpResponse.json(fakeDailyMay2026());
+    return HttpResponse.json({
+      month,
+      base_currency: "EUR",
+      today: "2026-05-16",
+      forecast_available: false,
+      points: [],
+    });
+  }),
+
+  http.get("/api/forecast/monthly-buckets", ({ request }) => {
+    const url = new URL(request.url);
+    const horizon = url.searchParams.get("horizon") ?? "3m";
+    const mode = url.searchParams.get("mode") ?? "centered";
+    return HttpResponse.json({
+      horizon, mode,
+      base_currency: "EUR",
+      today: "2026-05-16",
+      forecast_available: true,
+      points: [
+        { month: "2026-04", total: "200", actual_mtd: null, forecast_remainder: null, kind: "past" },
+        { month: "2026-05", total: "300", actual_mtd: "160", forecast_remainder: "140", kind: "current" },
+        { month: "2026-06", total: "250", actual_mtd: null, forecast_remainder: null, kind: "future" },
+      ],
+    });
+  }),
+];
+
 export const handlers = [
   http.get("/api/health", () =>
     HttpResponse.json({ status: "ok" }),
@@ -249,4 +300,6 @@ export const handlers = [
       ok: true,
     });
   }),
+
+  ...forecastHandlers,
 ];
