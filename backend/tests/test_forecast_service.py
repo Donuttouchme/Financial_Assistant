@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
-from app.services import forecast_service
+from app.services import forecast_service, settings_service
 from app.models.category import Category
 from app.models.transaction import Transaction
 
@@ -188,3 +188,148 @@ def test_projected_monthly_total_scopes_by_user_and_category(db_session):
     )
     # 30 EUR over 90-day window: rate 30/90 = 1/3 EUR/day * 30 days = 10 EUR/month.
     assert abs(total - Decimal("10")) < Decimal("0.1")
+
+
+# ---------------------------------------------------------------------------
+# Step 6.1 – cold-start helpers
+# ---------------------------------------------------------------------------
+
+def test_forecast_available_requires_30_days_history(db_session):
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+    # 25 distinct days of expense — below the 30-day threshold.
+    db_session.add_all([
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("1"),
+                    currency="EUR",
+                    date=date(2026, 5, 1) - timedelta(days=i + 1),
+                    description="")
+        for i in range(25)
+    ])
+    db_session.commit()
+    assert forecast_service.forecast_available(
+        db_session, user_id=1, as_of=date(2026, 5, 1),
+    ) is False
+
+    # Add 5 more distinct days to cross the threshold.
+    db_session.add_all([
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("1"),
+                    currency="EUR",
+                    date=date(2026, 5, 1) - timedelta(days=i + 26),
+                    description="")
+        for i in range(5)
+    ])
+    db_session.commit()
+    assert forecast_service.forecast_available(
+        db_session, user_id=1, as_of=date(2026, 5, 1),
+    ) is True
+
+
+def test_use_profile_requires_60_days_history(db_session):
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+    db_session.add_all([
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("1"),
+                    currency="EUR",
+                    date=date(2026, 5, 1) - timedelta(days=i + 1),
+                    description="")
+        for i in range(45)
+    ])
+    db_session.commit()
+    # 45 days: forecast yes, profile no.
+    assert forecast_service.forecast_available(
+        db_session, user_id=1, as_of=date(2026, 5, 1),
+    ) is True
+    assert forecast_service.use_profile(
+        db_session, user_id=1, as_of=date(2026, 5, 1),
+    ) is False
+
+
+# ---------------------------------------------------------------------------
+# Step 6.3 – daily_cumulative
+# ---------------------------------------------------------------------------
+
+def test_daily_cumulative_basic_shape_in_eur_base(db_session):
+    settings_service.set_base_currency(db_session, "EUR")
+
+    today = date(2026, 5, 16)
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+
+    db_session.add(Transaction(
+        user_id=1, category_id=food.id, amount=Decimal("20"),
+        currency="EUR", date=date(2026, 5, 5), description="",
+    ))
+    db_session.commit()
+
+    resp = forecast_service.daily_cumulative(
+        db_session, user_id=1, month="2026-05", today=today,
+    )
+
+    assert resp.month == "2026-05"
+    assert resp.base_currency == "EUR"
+    assert resp.today == today
+    assert len(resp.points) == 31
+
+    p5 = next(p for p in resp.points if p.date == date(2026, 5, 5))
+    assert p5.cumulative == Decimal("20")
+    assert p5.is_forecast is False
+
+    p17 = next(p for p in resp.points if p.date == date(2026, 5, 17))
+    assert p17.is_forecast is True
+
+    # No history → no forecast → future cumulative = today cumulative.
+    today_pt = next(p for p in resp.points if p.date == today)
+    assert p17.cumulative == today_pt.cumulative
+
+
+def test_daily_cumulative_with_sufficient_history(db_session):
+    settings_service.set_base_currency(db_session, "EUR")
+
+    today = date(2026, 5, 16)
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+
+    # 90 days of EUR 5/day = 5/day rate → 150 EUR/month projection.
+    db_session.add_all([
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("5"),
+                    currency="EUR",
+                    date=today - timedelta(days=i + 1),
+                    description="")
+        for i in range(90)
+    ])
+    db_session.commit()
+
+    resp = forecast_service.daily_cumulative(
+        db_session, user_id=1, month="2026-05", today=today,
+    )
+
+    assert resp.forecast_available is True
+    # Future cumulative must be strictly greater than today's cumulative.
+    today_pt = next(p for p in resp.points if p.date == today)
+    last_pt = resp.points[-1]
+    assert last_pt.is_forecast is True
+    assert last_pt.cumulative > today_pt.cumulative
+
+
+def test_daily_cumulative_category_filter(db_session):
+    settings_service.set_base_currency(db_session, "EUR")
+    today = date(2026, 5, 16)
+
+    food = Category(name="Food", kind="expense", user_id=1)
+    fuel = Category(name="Fuel", kind="expense", user_id=1)
+    db_session.add_all([food, fuel]); db_session.commit()
+
+    db_session.add_all([
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("10"),
+                    currency="EUR", date=date(2026, 5, 1), description=""),
+        Transaction(user_id=1, category_id=fuel.id, amount=Decimal("99"),
+                    currency="EUR", date=date(2026, 5, 1), description=""),
+    ])
+    db_session.commit()
+
+    resp = forecast_service.daily_cumulative(
+        db_session, user_id=1, month="2026-05", today=today,
+        category_id=food.id,
+    )
+    today_pt = next(p for p in resp.points if p.date == today)
+    assert today_pt.cumulative == Decimal("10")  # fuel excluded
