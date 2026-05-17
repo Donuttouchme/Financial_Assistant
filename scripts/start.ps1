@@ -28,6 +28,8 @@ $launcherLog = Join-Path $logDir "launcher.log"
 $uvOutLog    = Join-Path $logDir "uvicorn-stdout.log"
 $uvErrLog    = Join-Path $logDir "uvicorn-stderr.log"
 
+$uvExitCode = $null
+
 # --- Logging --------------------------------------------------------------
 $logSizeBudgetBytes = 1MB
 
@@ -280,7 +282,8 @@ try {
         # Block until uvicorn exits.
         LogI "Waiting for uvicorn to exit..."
         Wait-Process -Id $uv.Id
-        LogI "Uvicorn exited cleanly (exit code $($uv.ExitCode))."
+        $uvExitCode = $uv.ExitCode
+        LogI "Uvicorn exited (exit code $uvExitCode)."
     } finally {
         Stop-Tree $uv.Id
     }
@@ -291,4 +294,11 @@ try {
     LogE "Stack trace:"
     LogE $stack
     Fail "Unexpected error: $($err.Exception.Message)"
+}
+
+# Propagate uvicorn's exit code so RUN.bat can act on it (exit 75 = "please
+# relaunch me", used by the backup-restore flow to re-enter the lifespan
+# startup with a freshly staged DB).
+if ($null -ne $uvExitCode) {
+    exit $uvExitCode
 }
