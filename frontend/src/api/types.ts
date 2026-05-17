@@ -164,3 +164,41 @@ export interface ImportCommitResponse {
   imported: number;
   skipped: number;
 }
+
+// ---------- Forecast ----------
+
+export interface DailyPoint {
+  date: string; // ISO YYYY-MM-DD
+  cumulative: string; // Decimal string
+  is_forecast: boolean;
+}
+
+export interface DailyCumulativeResponse {
+  month: string;
+  base_currency: string;
+  today: string;
+  forecast_available: boolean;
+  points: DailyPoint[];
+}
+
+export type BucketKind = "past" | "current" | "future";
+
+export interface MonthlyPoint {
+  month: string;
+  total: string;
+  actual_mtd: string | null;
+  forecast_remainder: string | null;
+  kind: BucketKind;
+}
+
+export type ForecastHorizon = "1m" | "3m" | "6m" | "1y" | "2y";
+export type ForecastMode = "centered" | "forward";
+
+export interface MonthlyBucketsResponse {
+  horizon: ForecastHorizon;
+  mode: ForecastMode;
+  base_currency: string;
+  today: string;
+  forecast_available: boolean;
+  points: MonthlyPoint[];
+}
