@@ -25,9 +25,10 @@ def test_actual_mtd_sums_expense_only_in_base_currency(db_session):
 
     cum = forecast_service.actual_mtd(
         db_session, user_id=1, month="2026-05", through=date(2026, 5, 3),
+        base_currency="EUR",
     )
 
-    # Base currency defaults to EUR in tests; amounts are EUR; so base_amount == amount.
+    # Amounts are EUR, base is EUR; no FX needed; so base_amount == amount.
     assert cum[date(2026, 5, 1)] == Decimal("10")
     assert cum[date(2026, 5, 2)] == Decimal("10")  # no expense day 2; cumulative steady
     assert cum[date(2026, 5, 3)] == Decimal("25")
@@ -50,6 +51,7 @@ def test_actual_mtd_scopes_by_user(db_session):
 
     cum = forecast_service.actual_mtd(
         db_session, user_id=1, month="2026-05", through=date(2026, 5, 1),
+        base_currency="EUR",
     )
     assert cum[date(2026, 5, 1)] == Decimal("10")  # user 2's tx is invisible
 
@@ -71,8 +73,46 @@ def test_actual_mtd_converts_foreign_currency_to_base(db_session):
 
     cum = forecast_service.actual_mtd(
         db_session, user_id=1, month="2026-05", through=date(2026, 5, 1),
+        base_currency="EUR",
     )
     assert cum[date(2026, 5, 1)] == Decimal("5.00")  # 10 USD / 2.0
+
+
+def test_actual_mtd_includes_same_currency_tx_without_fx_row(db_session):
+    """Same-currency transactions must NOT require FX coverage.
+
+    Regression for v1.2.1: forecast_service hardcoded an EUR pivot and routed
+    every transaction through `_compute_base_amount(..., base_currency=EUR)`.
+    For a CHF-base user with CHF transactions, this required `rate(CHF, date)`
+    rows that simply don't exist for historical days, so those transactions
+    were silently dropped from the forecast (returned None → `continue`). Only
+    transactions added on days where the user happened to refresh FX rates
+    (typically today) survived — matching the user-reported symptom that "only
+    after-update transactions show up".
+
+    Same-currency conversion should never need an FX lookup.
+    """
+    settings_service.set_base_currency(db_session, "CHF")
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+
+    db_session.add_all([
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("100"),
+                    currency="CHF", date=date(2026, 5, 2), description=""),
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("50"),
+                    currency="CHF", date=date(2026, 5, 3), description=""),
+    ])
+    db_session.commit()
+
+    # No FxRate rows at all — same-currency conversions must still succeed.
+    resp = forecast_service.daily_cumulative(
+        db_session, user_id=1, month="2026-05", today=date(2026, 5, 5),
+    )
+    assert resp.base_currency == "CHF"
+    p2 = next(p for p in resp.points if p.date == date(2026, 5, 2))
+    p5 = next(p for p in resp.points if p.date == date(2026, 5, 5))
+    assert p2.cumulative == Decimal("100.00")
+    assert p5.cumulative == Decimal("150.00")
 
 
 def test_day_of_month_profile_normalizes_to_one(db_session):
@@ -90,6 +130,7 @@ def test_day_of_month_profile_normalizes_to_one(db_session):
 
     profile = forecast_service.day_of_month_profile(
         db_session, user_id=1, category_id=food.id, as_of=date(2026, 5, 1),
+        base_currency="EUR",
     )
 
     assert len(profile) == 31
@@ -107,6 +148,7 @@ def test_day_of_month_profile_flat_when_no_data(db_session):
 
     profile = forecast_service.day_of_month_profile(
         db_session, user_id=1, category_id=food.id, as_of=date(2026, 5, 1),
+        base_currency="EUR",
     )
 
     assert len(profile) == 31
@@ -127,6 +169,7 @@ def test_day_of_month_profile_ignores_other_users(db_session):
 
     profile = forecast_service.day_of_month_profile(
         db_session, user_id=1, category_id=food1.id, as_of=date(2026, 5, 1),
+        base_currency="EUR",
     )
     # No user-1 data → flat.
     assert all(abs(p - Decimal("1") / 31) < Decimal("0.001") for p in profile)
@@ -148,6 +191,7 @@ def test_projected_monthly_total_extrapolates_trailing_window(db_session):
 
     total = forecast_service.projected_monthly_total(
         db_session, user_id=1, category_id=food.id, as_of=date(2026, 5, 1),
+        base_currency="EUR",
     )
 
     # 90 * 10 / 90 * 30 = 300, but the trailing window excludes today so we
@@ -161,6 +205,7 @@ def test_projected_monthly_total_zero_when_no_history(db_session):
 
     total = forecast_service.projected_monthly_total(
         db_session, user_id=1, category_id=food.id, as_of=date(2026, 5, 1),
+        base_currency="EUR",
     )
     assert total == Decimal(0)
 
@@ -186,6 +231,7 @@ def test_projected_monthly_total_scopes_by_user_and_category(db_session):
 
     total = forecast_service.projected_monthly_total(
         db_session, user_id=1, category_id=food1.id, as_of=date(2026, 5, 1),
+        base_currency="EUR",
     )
     # 30 EUR over 90-day window: rate 30/90 = 1/3 EUR/day * 30 days = 10 EUR/month.
     assert abs(total - Decimal("10")) < Decimal("0.1")

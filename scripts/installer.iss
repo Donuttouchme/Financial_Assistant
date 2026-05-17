@@ -5,7 +5,7 @@
 #define MyAppPublisher "Donuttouchme"
 #define MyAppURL "https://github.com/Donuttouchme/Financial_Assistant"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.1"
+  #define MyAppVersion "1.2.2"
 #endif
 
 [Setup]
@@ -47,6 +47,7 @@ Source: "financial-assistant.ico"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\RUN.bat"; IconFilename: "{app}\financial-assistant.ico"; WorkingDir: "{app}"; Comment: "Open Financial Assistant in your browser"
 Name: "{group}\Stop {#MyAppName}"; Filename: "{app}\STOP.bat"; WorkingDir: "{app}"
+Name: "{group}\Collect diagnostics"; Filename: "{app}\COLLECT-LOGS.bat"; WorkingDir: "{app}"; Comment: "Bundle log files into a zip on your Desktop for troubleshooting"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\RUN.bat"; IconFilename: "{app}\financial-assistant.ico"; WorkingDir: "{app}"; Tasks: desktopicon
 
