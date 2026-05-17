@@ -30,3 +30,7 @@ htmlcov/
 scripts/start-error.log
 scripts/uvicorn-stdout.log
 scripts/uvicorn-stderr.log
+
+# Per-machine Claude Code session/worktree state and MCP browser artefacts
+.claude/
+.playwright-mcp/
