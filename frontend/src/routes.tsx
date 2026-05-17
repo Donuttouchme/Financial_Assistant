@@ -5,6 +5,7 @@ import TransactionsPage from "@/pages/TransactionsPage";
 import CategoriesPage from "@/pages/CategoriesPage";
 import BudgetsPage from "@/pages/BudgetsPage";
 import ExportPage from "@/pages/ExportPage";
+import ForecastPage from "@/pages/ForecastPage";
 import ImportPage from "@/pages/ImportPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import SettingsPage from "@/pages/SettingsPage";
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: "budgets", element: <BudgetsPage /> },
       { path: "import", element: <ImportPage /> },
       { path: "export", element: <ExportPage /> },
+      { path: "forecast", element: <ForecastPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
