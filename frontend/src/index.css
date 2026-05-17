@@ -150,7 +150,9 @@
 
   .cyberpunk {
     color-scheme: dark;
-    /* Palette: near-black bg, neon yellow primary, cyan accent, magenta destructive */
+    /* Palette: near-black bg, neon yellow primary, cyan accent, magenta destructive.
+       Geometry stays vanilla (default radius, calm borders) so the neon palette
+       can carry the identity without the chrome feeling clanky. */
     --background: 240 15% 6%;
     --foreground: 60 100% 96%;
     --card: 240 15% 8%;
@@ -167,59 +169,14 @@
     --accent-foreground: 240 15% 6%;
     --destructive: 343 100% 50%;
     --destructive-foreground: 60 100% 96%;
-    --border: 56 100% 51%;
+    --border: 240 10% 18%;
     --input: 240 10% 18%;
     --ring: 56 100% 51%;
-    --radius: 0;
     --chart-1: 56 100% 51%;
     --chart-2: 187 100% 50%;
     --chart-3: 343 100% 50%;
     --chart-4: 280 100% 65%;
     --chart-5: 100 100% 50%;
-  }
-
-  /* Geometry overrides — neutralize Tailwind's static rounded utilities */
-  .cyberpunk .rounded,
-  .cyberpunk .rounded-sm,
-  .cyberpunk .rounded-md,
-  .cyberpunk .rounded-lg,
-  .cyberpunk .rounded-xl,
-  .cyberpunk .rounded-2xl,
-  .cyberpunk .rounded-full {
-    border-radius: 0 !important;
-  }
-
-  /* Heavier borders */
-  .cyberpunk * {
-    border-width: 1px;
-  }
-  .cyberpunk .border,
-  .cyberpunk .border-input,
-  .cyberpunk .border-border {
-    border-width: 2px;
-  }
-
-  /* Card notch — angular cut top-right corner */
-  .cyberpunk [data-slot="card"],
-  .cyberpunk .cyberpunk-notch {
-    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
-  }
-
-  /* Subtle scanline overlay on body — z-index below Radix portals (z-50)
-     so dialogs, dropdowns, tooltips render above the scanline. */
-  .cyberpunk body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    background: repeating-linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0) 0px,
-      rgba(0, 0, 0, 0) 2px,
-      rgba(0, 0, 0, 0.04) 3px,
-      rgba(0, 0, 0, 0) 4px
-    );
-    z-index: 10;
   }
 
   /* Emerald: faint film-grain noise overlay for an organic, breathing texture */
