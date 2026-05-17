@@ -2,7 +2,7 @@ import { KpiRow } from "@/components/dashboard/KpiRow";
 import { BudgetWidget } from "@/components/dashboard/BudgetWidget";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { CategoryDonut } from "@/components/dashboard/CategoryDonut";
-import { MonthlyTrendBar } from "@/components/dashboard/MonthlyTrendBar";
+import { ForecastWidget } from "@/components/dashboard/ForecastWidget";
 import { SavingsGoalsRow } from "@/components/dashboard/SavingsGoalsRow";
 import { MissingRatesBanner } from "@/components/dashboard/MissingRatesBanner";
 import { EmptyAppState } from "@/components/EmptyAppState";
@@ -32,7 +32,7 @@ export default function DashboardPage() {
       <BudgetWidget month={month} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <CategoryDonut month={month} />
-        <MonthlyTrendBar month={month} />
+        <ForecastWidget month={month} />
       </div>
       <RecentTransactions month={month} />
     </div>
