@@ -8,7 +8,7 @@ import { ForecastChart } from "@/components/forecast/ForecastChart";
 import { CategoryFilter } from "@/components/forecast/CategoryFilter";
 import { HorizonPicker } from "@/components/forecast/HorizonPicker";
 import { ForecastModeToggle } from "@/components/forecast/ForecastModeToggle";
-import { ColdStartHint } from "@/components/forecast/ColdStartHint";
+import { ForecastEmptyState } from "@/components/forecast/ColdStartHint";
 import { useCategories } from "@/hooks/queries/useCategories";
 import {
   useDailyCumulative, useMonthlyBuckets,
@@ -67,20 +67,18 @@ export default function ForecastPage() {
           {isDailyMode ? (
             daily.isLoading || !daily.data ? (
               <Skeleton className="h-72 w-full" />
+            ) : !daily.data.forecast_available ? (
+              <ForecastEmptyState />
             ) : (
-              <>
-                <ForecastChart mode="daily" daily={daily.data} />
-                {!daily.data.forecast_available && <ColdStartHint reason="no-forecast" />}
-              </>
+              <ForecastChart mode="daily" daily={daily.data} />
             )
           ) : (
             monthly.isLoading || !monthly.data ? (
               <Skeleton className="h-72 w-full" />
+            ) : !monthly.data.forecast_available ? (
+              <ForecastEmptyState />
             ) : (
-              <>
-                <ForecastChart mode="monthly" monthly={monthly.data} />
-                {!monthly.data.forecast_available && <ColdStartHint reason="no-forecast" />}
-              </>
+              <ForecastChart mode="monthly" monthly={monthly.data} />
             )
           )}
         </CardContent>

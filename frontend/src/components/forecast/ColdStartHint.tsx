@@ -1,18 +1,21 @@
-import { Info } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
-interface Props {
-  reason: "no-forecast" | "thin-data";
-}
-
-export function ColdStartHint({ reason }: Props) {
-  const msg =
-    reason === "no-forecast"
-      ? "Forecast appears after about 30 days of activity."
-      : "Forecast accuracy improves with more history (60+ days for full per-day projection).";
+/**
+ * Empty-state placeholder rendered inside the forecast chart card when the
+ * user has no expense history at all. Keeps the widget visible (same chrome,
+ * same height as the chart) so adding the first transaction reveals data in
+ * place rather than swapping cards.
+ */
+export function ForecastEmptyState() {
   return (
-    <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-      <Info className="h-3.5 w-3.5" aria-hidden />
-      <span>{msg}</span>
-    </p>
+    <div className="h-72 w-full flex flex-col items-center justify-center text-center gap-2 text-muted-foreground">
+      <Sparkles className="h-6 w-6 opacity-60" aria-hidden />
+      <p className="text-sm">
+        Your forecast will appear here as you add transactions.
+      </p>
+      <p className="text-xs opacity-80">
+        The graph sharpens automatically once a few weeks of activity are on file.
+      </p>
+    </div>
   );
 }

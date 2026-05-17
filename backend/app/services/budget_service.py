@@ -94,6 +94,8 @@ def list_budgets_with_spending(
             else_=alias.c.rate_to_eur,
         )
 
+    # rate_to_eur(X) stores "1 EUR = X currency-units" (frankfurter convention).
+    # Native -> base: amount * rate(base) / rate(native).
     base_amount_expr = case(
         (Transaction.currency == base_currency, Transaction.amount),
         (
@@ -102,8 +104,8 @@ def list_budgets_with_spending(
             None,
         ),
         else_=Transaction.amount
-        * _rate_expr(fx_native, Transaction.currency)
-        / _rate_expr(fx_base, base_currency),
+        * _rate_expr(fx_base, base_currency)
+        / _rate_expr(fx_native, Transaction.currency),
     )
 
     spent_subq = (

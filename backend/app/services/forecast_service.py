@@ -240,10 +240,6 @@ def projected_monthly_total(
 # Step 6.1 – cold-start helpers
 # ---------------------------------------------------------------------------
 
-_FORECAST_MIN_DAYS = 30
-_PROFILE_MIN_DAYS = 60
-
-
 def expense_history_days(db: Session, *, user_id: int, as_of: date) -> int:
     """Distinct days in the trailing 365 days on which this user recorded
     any expense transaction."""
@@ -265,11 +261,15 @@ def expense_history_days(db: Session, *, user_id: int, as_of: date) -> int:
 
 
 def forecast_available(db: Session, *, user_id: int, as_of: date) -> bool:
-    return expense_history_days(db, user_id=user_id, as_of=as_of) >= _FORECAST_MIN_DAYS
+    """True when the user has any expense history at all.
 
-
-def use_profile(db: Session, *, user_id: int, as_of: date) -> bool:
-    return expense_history_days(db, user_id=user_id, as_of=as_of) >= _PROFILE_MIN_DAYS
+    Flips the empty-state placeholder on the dashboard widget / forecast page
+    when there's literally nothing to show. We always run the forecast math
+    regardless of how thin the history is — the day-of-month profile falls
+    back to a flat distribution when a category has no past spend, and the
+    monthly projection naturally returns zero when there's no trailing data.
+    """
+    return expense_history_days(db, user_id=user_id, as_of=as_of) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -279,8 +279,9 @@ def use_profile(db: Session, *, user_id: int, as_of: date) -> bool:
 def _eur_to_base_factor(db: Session, *, base_currency: str, on: date) -> Decimal | None:
     """Return the factor F such that `base_amount = eur_amount * F` on date `on`.
 
-    For EUR base, returns 1.0.
-    For others, returns 1 / FxRate.rate_to_eur(base, on), or None if missing.
+    rate_to_eur(X) stores "1 EUR = X currency-units" (frankfurter convention),
+    so the EUR -> base factor IS rate_to_eur(base). For EUR base, returns 1.0.
+    Returns None when no rate row exists for (base, on).
     """
     if base_currency == "EUR":
         return Decimal("1")
@@ -289,9 +290,9 @@ def _eur_to_base_factor(db: Session, *, base_currency: str, on: date) -> Decimal
             FxRate.currency == base_currency, FxRate.date == on
         )
     ).scalar_one_or_none()
-    if rate is None or rate == 0:
+    if rate is None:
         return None
-    return Decimal("1") / rate
+    return rate
 
 
 # ---------------------------------------------------------------------------
@@ -309,11 +310,13 @@ def daily_cumulative(
     """Compose per-day cumulative expense for one calendar month.
 
     Past + today portion uses real transactions via `actual_mtd`. Future
-    portion (today+1 → end of month) is projected from each expense
-    category's day-of-month profile × projected monthly total, allocated
-    over remaining days of the month. The forecast tail is only emitted
-    when 30+ days of trailing expense history exist; otherwise future
-    points hold the today-MTD value.
+    portion (today+1 -> end of month) is projected from each expense
+    category's day-of-month profile x projected monthly total, allocated
+    over remaining days of the month. The forecast is always computed:
+    `day_of_month_profile` returns a flat distribution when a category has
+    no history yet, and `projected_monthly_total` returns zero when there's
+    no trailing data — together they produce a sensible-but-quiet forecast
+    on day 1 that sharpens as data accumulates.
 
     Internal math is in EUR; the response is converted to the user's chosen
     base currency using FX rates on `today` (single factor applied to all
@@ -327,12 +330,11 @@ def daily_cumulative(
         db, user_id=user_id, month=month, through=mtd_end, category_id=category_id,
     )
 
-    has_forecast = forecast_available(db, user_id=user_id, as_of=today)
-    use_prof = use_profile(db, user_id=user_id, as_of=today)
+    has_any_history = forecast_available(db, user_id=user_id, as_of=today)
 
     # Build per-day forecast contributions (in EUR) for days after today.
     future_per_day_eur: dict[date, Decimal] = {}
-    if has_forecast and today < last:
+    if today < last:
         cat_stmt = select(Category).where(
             Category.user_id == user_id, Category.kind == "expense",
         )
@@ -344,13 +346,9 @@ def daily_cumulative(
             )
             if projected <= 0:
                 continue
-            if use_prof:
-                profile = day_of_month_profile(
-                    db, user_id=user_id, category_id=cat.id, as_of=today,
-                )
-            else:
-                # <60 days history: flat per-day distribution.
-                profile = [Decimal("1") / last.day] * 31
+            profile = day_of_month_profile(
+                db, user_id=user_id, category_id=cat.id, as_of=today,
+            )
 
             remaining_days = list(range(today.day + 1, last.day + 1))
             if not remaining_days:
@@ -382,8 +380,7 @@ def daily_cumulative(
             running_eur = actuals_eur.get(d, running_eur)
             is_fc = False
         else:
-            if has_forecast:
-                running_eur += future_per_day_eur.get(d, Decimal(0))
+            running_eur += future_per_day_eur.get(d, Decimal(0))
             is_fc = True
         cumulative = (running_eur * factor).quantize(Decimal("0.01"))
         points.append(DailyPoint(date=d, cumulative=cumulative, is_forecast=is_fc))
@@ -393,7 +390,7 @@ def daily_cumulative(
         month=month,
         base_currency=base_currency,
         today=today,
-        forecast_available=has_forecast,
+        forecast_available=has_any_history,
         points=points,
     )
 
@@ -524,7 +521,7 @@ def monthly_buckets(
 
     base_currency = settings_service.get_settings(db).base_currency
     factor = _eur_to_base_factor(db, base_currency=base_currency, on=today) or Decimal("1")
-    has_forecast = forecast_available(db, user_id=user_id, as_of=today)
+    has_any_history = forecast_available(db, user_id=user_id, as_of=today)
 
     points: list[MonthlyPoint] = []
     for label in labels:
@@ -554,9 +551,12 @@ def monthly_buckets(
                 forecast_remainder=remainder, kind="current",
             ))
         else:
+            # Always project — `projected_monthly_total` returns 0 when no
+            # history exists, so the bar will be zero-height rather than
+            # absent. This keeps the chart shape continuous from day 1.
             future_eur = _future_month_total_eur(
                 db, user_id=user_id, today=today, category_id=category_id,
-            ) if has_forecast else Decimal(0)
+            )
             points.append(MonthlyPoint(
                 month=label,
                 total=(future_eur * factor).quantize(Decimal("0.01")),
@@ -565,5 +565,5 @@ def monthly_buckets(
 
     return MonthlyBucketsResponse(
         horizon=horizon, mode=mode, base_currency=base_currency,
-        today=today, forecast_available=has_forecast, points=points,
+        today=today, forecast_available=has_any_history, points=points,
     )

@@ -96,7 +96,8 @@ def test_spent_aggregates_in_base_currency(client, db_session):
     db_session.add(
         BudgetLimit(user_id=1, category_id=cat.id, month="2026-05", monthly_limit=Decimal("200"))
     )
-    # 100 CHF + 50 EUR (where 1 EUR = 1/0.96 CHF ≈ 1.0417 CHF, 50 EUR ≈ 52.08 CHF) = ~152.08 CHF
+    # rate_to_eur(CHF) = 0.96 means "1 EUR = 0.96 CHF" (frankfurter convention).
+    # So 50 EUR -> CHF = 50 * 0.96 = 48 CHF. Total spent in CHF: 100 + 48 = 148.00.
     db_session.add(Transaction(
         user_id=1, amount=Decimal("100"), date=date(2026, 5, 10),
         category_id=cat.id, description="x", currency="CHF",
@@ -116,5 +117,5 @@ def test_spent_aggregates_in_base_currency(client, db_session):
     body = resp.json()
     assert len(body) == 1
     spent = Decimal(body[0]["spent"]).quantize(Decimal("0.01"))
-    # 100 CHF + 50 EUR converted: 100 + (50 * 1.0 / 0.96) = 100 + 52.0833... = 152.08
-    assert spent == Decimal("152.08")
+    # 100 CHF (native) + 50 EUR * 0.96 = 100 + 48 = 148.00 CHF
+    assert spent == Decimal("148.00")

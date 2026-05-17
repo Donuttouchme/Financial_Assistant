@@ -73,5 +73,6 @@ def test_export_includes_currency_columns(client, db_session):
     idx_base_ccy = header.index("base_currency")
     assert data_row[idx_currency] == "EUR"
     assert data_row[idx_base_ccy] == "CHF"
-    # 12.50 EUR * 1.0 / 0.96 = 13.02 CHF
-    assert Decimal(data_row[idx_base]).quantize(Decimal("0.01")) == Decimal("13.02")
+    # rate_to_eur(CHF) = 0.96 means "1 EUR = 0.96 CHF" (frankfurter convention).
+    # 12.50 EUR -> CHF = 12.50 * 0.96 = 12.00 CHF
+    assert Decimal(data_row[idx_base]).quantize(Decimal("0.01")) == Decimal("12.00")

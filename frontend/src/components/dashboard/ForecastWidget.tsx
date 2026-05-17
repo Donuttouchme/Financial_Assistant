@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ForecastChart } from "@/components/forecast/ForecastChart";
 import { CategoryFilter } from "@/components/forecast/CategoryFilter";
-import { ColdStartHint } from "@/components/forecast/ColdStartHint";
+import { ForecastEmptyState } from "@/components/forecast/ColdStartHint";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { useDailyCumulative } from "@/hooks/queries/useForecast";
 
@@ -43,11 +43,10 @@ export function ForecastWidget({ month }: Props) {
       <CardContent>
         {isLoading || !data ? (
           <Skeleton className="h-72 w-full" />
+        ) : !data.forecast_available ? (
+          <ForecastEmptyState />
         ) : (
-          <>
-            <ForecastChart mode="daily" daily={data} />
-            {!data.forecast_available && <ColdStartHint reason="no-forecast" />}
-          </>
+          <ForecastChart mode="daily" daily={data} />
         )}
       </CardContent>
     </Card>

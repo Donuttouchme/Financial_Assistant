@@ -14,7 +14,7 @@ function Logo() {
     >
       <circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" strokeWidth="3" />
       <path
-        d="M 16 4 A 12 12 0 0 1 28 16 L 22 16 A 6 6 0 0 0 16 10 Z"
+        d="M 16 16 L 16 4 A 12 12 0 0 1 28 16 Z"
         fill="currentColor"
       />
     </svg>

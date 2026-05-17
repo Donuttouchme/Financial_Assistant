@@ -46,6 +46,13 @@ def _compute_base_amount(
 ) -> Decimal | None:
     """Return amount expressed in base_currency, or None if conversion not possible.
 
+    Rates are stored in frankfurter convention: `rate_to_eur(X)` is the number
+    of `X` units that one EUR buys (i.e. 1 EUR = rate_to_eur(X) X). To convert
+    amount_native -> amount_base:
+        amount_native EUR-equivalent = amount / rate(native)
+        amount_base = (amount / rate(native)) * rate(base)
+                    = amount * rate(base) / rate(native)
+
     Rules:
       - If currency == base, return amount unchanged.
       - EUR rate is always 1.0 (it's the pivot).
@@ -62,9 +69,9 @@ def _compute_base_amount(
 
     r_native = lookup(currency)
     r_base = lookup(base_currency)
-    if r_native is None or r_base is None or r_base == 0:
+    if r_native is None or r_base is None or r_native == 0:
         return None
-    return (amount * r_native / r_base).quantize(_TWO_PLACES)
+    return (amount * r_base / r_native).quantize(_TWO_PLACES)
 
 
 def _load_rates_for(

@@ -52,11 +52,13 @@ def _convert(amount: Decimal, old_base: str, new_base: str, db: Session, when: d
 
     r_old = rate(old_base)
     r_new = rate(new_base)
-    if r_old is None or r_new is None or r_new == 0:
+    # rate_to_eur(X) is "1 EUR = X currency-units" (frankfurter convention),
+    # so converting old -> new is: amount * r_new / r_old.
+    if r_old is None or r_new is None or r_old == 0:
         raise FxNotAvailableError(
             f"FX rate for {old_base} or {new_base} not available on {when.isoformat()}"
         )
-    return (amount * r_old / r_new).quantize(_TWO_PLACES)
+    return (amount * r_new / r_old).quantize(_TWO_PLACES)
 
 
 def preview_base_currency_change(db: Session, new_base: str, user_id: int) -> dict:

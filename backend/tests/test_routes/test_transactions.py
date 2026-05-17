@@ -35,8 +35,8 @@ def test_transaction_read_base_amount_converts(client, db_session):
     settings_service.set_base_currency(db_session, "CHF")
     cat = Category(user_id=1, name="Groceries", kind="expense")
     db_session.add(cat)
-    # CHF: 0.96 EUR ; EUR: 1.0 EUR -> 1 EUR = 1/0.96 CHF
-    # transaction amount 100 EUR -> base = 100 * 1.0 / 0.96 = 104.166666... CHF
+    # rate_to_eur(CHF) = 0.96 means "1 EUR = 0.96 CHF" (frankfurter convention).
+    # 100 EUR -> CHF = 100 * 0.96 = 96.00.
     db_session.add(FxRate(currency="EUR", date=date(2026, 5, 14), rate_to_eur=Decimal("1.0")))
     db_session.add(FxRate(currency="CHF", date=date(2026, 5, 14), rate_to_eur=Decimal("0.96")))
     db_session.commit()
@@ -54,7 +54,7 @@ def test_transaction_read_base_amount_converts(client, db_session):
     assert resp.status_code == 201
     body = resp.json()
     assert body["currency"] == "EUR"
-    assert Decimal(body["base_amount"]).quantize(Decimal("0.01")) == Decimal("104.17")
+    assert Decimal(body["base_amount"]).quantize(Decimal("0.01")) == Decimal("96.00")
 
 
 def test_transaction_read_base_amount_none_when_missing_rate(client, db_session):

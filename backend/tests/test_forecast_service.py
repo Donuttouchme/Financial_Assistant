@@ -60,9 +60,10 @@ def test_actual_mtd_converts_foreign_currency_to_base(db_session):
     food = Category(name="Food", kind="expense", user_id=1)
     db_session.add(food); db_session.commit()
 
-    # Default base is EUR. Add a USD rate so 10 USD = 9 EUR on this date.
+    # rate_to_eur(USD) = 2.0 means "1 EUR = 2 USD" (frankfurter convention).
+    # So 10 USD -> EUR = 10 / 2 = 5.00 EUR.
     db_session.add(FxRate(currency="USD", date=date(2026, 5, 1),
-                          rate_to_eur=Decimal("0.9")))
+                          rate_to_eur=Decimal("2.0")))
     db_session.add(Transaction(user_id=1, category_id=food.id,
                                amount=Decimal("10"), currency="USD",
                                date=date(2026, 5, 1), description=""))
@@ -71,7 +72,7 @@ def test_actual_mtd_converts_foreign_currency_to_base(db_session):
     cum = forecast_service.actual_mtd(
         db_session, user_id=1, month="2026-05", through=date(2026, 5, 1),
     )
-    assert cum[date(2026, 5, 1)] == Decimal("9.00")  # 10 USD × 0.9
+    assert cum[date(2026, 5, 1)] == Decimal("5.00")  # 10 USD / 2.0
 
 
 def test_day_of_month_profile_normalizes_to_one(db_session):
@@ -194,52 +195,40 @@ def test_projected_monthly_total_scopes_by_user_and_category(db_session):
 # Step 6.1 – cold-start helpers
 # ---------------------------------------------------------------------------
 
-def test_forecast_available_requires_30_days_history(db_session):
+def test_forecast_available_false_when_no_history(db_session):
     food = Category(name="Food", kind="expense", user_id=1)
     db_session.add(food); db_session.commit()
-    # 25 distinct days of expense — below the 30-day threshold.
-    db_session.add_all([
-        Transaction(user_id=1, category_id=food.id, amount=Decimal("1"),
-                    currency="EUR",
-                    date=date(2026, 5, 1) - timedelta(days=i + 1),
-                    description="")
-        for i in range(25)
-    ])
-    db_session.commit()
+    # No expense transactions yet.
     assert forecast_service.forecast_available(
         db_session, user_id=1, as_of=date(2026, 5, 1),
     ) is False
 
-    # Add 5 more distinct days to cross the threshold.
-    db_session.add_all([
-        Transaction(user_id=1, category_id=food.id, amount=Decimal("1"),
-                    currency="EUR",
-                    date=date(2026, 5, 1) - timedelta(days=i + 26),
-                    description="")
-        for i in range(5)
-    ])
-    db_session.commit()
-    assert forecast_service.forecast_available(
-        db_session, user_id=1, as_of=date(2026, 5, 1),
-    ) is True
 
-
-def test_use_profile_requires_60_days_history(db_session):
+def test_forecast_available_true_with_any_history(db_session):
     food = Category(name="Food", kind="expense", user_id=1)
     db_session.add(food); db_session.commit()
-    db_session.add_all([
-        Transaction(user_id=1, category_id=food.id, amount=Decimal("1"),
-                    currency="EUR",
-                    date=date(2026, 5, 1) - timedelta(days=i + 1),
-                    description="")
-        for i in range(45)
-    ])
+    # A single expense day flips the flag — the forecast renders from day 1
+    # of usage; quality improves silently as data accumulates.
+    db_session.add(Transaction(
+        user_id=1, category_id=food.id, amount=Decimal("1"),
+        currency="EUR", date=date(2026, 4, 30), description="",
+    ))
     db_session.commit()
-    # 45 days: forecast yes, profile no.
     assert forecast_service.forecast_available(
         db_session, user_id=1, as_of=date(2026, 5, 1),
     ) is True
-    assert forecast_service.use_profile(
+
+
+def test_forecast_available_ignores_other_users(db_session):
+    food = Category(name="Food", kind="expense", user_id=2)
+    db_session.add(food); db_session.commit()
+    db_session.add(Transaction(
+        user_id=2, category_id=food.id, amount=Decimal("1"),
+        currency="EUR", date=date(2026, 4, 30), description="",
+    ))
+    db_session.commit()
+    # User 1 has no history of their own.
+    assert forecast_service.forecast_available(
         db_session, user_id=1, as_of=date(2026, 5, 1),
     ) is False
 

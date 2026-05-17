@@ -52,8 +52,9 @@ def test_preview_base_currency_lists_affected_budgets(client, db_session):
     assert len(budgets) == 1
     assert budgets[0]["category_name"] == "Food"
     assert budgets[0]["old_amount"] == "200.00"
-    # 200 CHF * 0.96 EUR / 1.0 EUR = 192 EUR (approximately)
-    assert Decimal(budgets[0]["new_amount"]).quantize(Decimal("0.01")) == Decimal("192.00")
+    # rate_to_eur(CHF) = 0.96 means "1 EUR = 0.96 CHF" (frankfurter convention).
+    # 200 CHF -> EUR = 200 * 1.0 / 0.96 = 208.33 EUR.
+    assert Decimal(budgets[0]["new_amount"]).quantize(Decimal("0.01")) == Decimal("208.33")
 
 
 def test_preview_base_currency_returns_409_when_rates_missing(client, db_session):

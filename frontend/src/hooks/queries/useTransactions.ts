@@ -30,6 +30,7 @@ export function useCreateTransaction() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: [TX_KEY_ROOT] });
       qc.invalidateQueries({ queryKey: ["budgets"] });
+      qc.invalidateQueries({ queryKey: ["forecast"] });
       if (!vars.silent) toast.success("Transaction added");
     },
     onError: reportError,
@@ -44,6 +45,7 @@ export function useUpdateTransaction() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [TX_KEY_ROOT] });
       qc.invalidateQueries({ queryKey: ["budgets"] });
+      qc.invalidateQueries({ queryKey: ["forecast"] });
       toast.success("Transaction updated");
     },
     onError: reportError,
@@ -57,6 +59,7 @@ export function useDeleteTransaction() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [TX_KEY_ROOT] });
       qc.invalidateQueries({ queryKey: ["budgets"] });
+      qc.invalidateQueries({ queryKey: ["forecast"] });
       toast.success("Transaction deleted");
     },
     onError: reportError,
