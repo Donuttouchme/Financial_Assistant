@@ -88,6 +88,66 @@
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
 
+  .emerald {
+    color-scheme: dark;
+    /* Palette: deep forest bg, emerald primary, cool jewel-tone chart accents */
+    --background: 155 25% 7%;
+    --foreground: 150 15% 92%;
+    --card: 155 25% 10%;
+    --card-foreground: 150 15% 92%;
+    --popover: 155 25% 10%;
+    --popover-foreground: 150 15% 92%;
+    --primary: 152 55% 48%;
+    --primary-foreground: 155 25% 7%;
+    --secondary: 155 18% 18%;
+    --secondary-foreground: 150 15% 92%;
+    --muted: 155 15% 15%;
+    --muted-foreground: 150 10% 65%;
+    --accent: 175 50% 35%;
+    --accent-foreground: 150 15% 92%;
+    --destructive: 5 65% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 155 18% 22%;
+    --input: 155 18% 18%;
+    --ring: 152 55% 48%;
+    --radius: 0.75rem;
+    --chart-1: 152 55% 55%;
+    --chart-2: 175 60% 50%;
+    --chart-3:  92 50% 55%;
+    --chart-4:  38 70% 60%;
+    --chart-5: 200 50% 60%;
+  }
+
+  .navy {
+    color-scheme: light;
+    /* Palette: cool off-white bg, deep navy primary, classic banker accents */
+    --background: 220 30% 98%;
+    --foreground: 220 60% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 60% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 60% 15%;
+    --primary: 220 75% 28%;
+    --primary-foreground: 220 30% 98%;
+    --secondary: 220 25% 92%;
+    --secondary-foreground: 220 60% 15%;
+    --muted: 220 25% 94%;
+    --muted-foreground: 220 20% 45%;
+    --accent: 195 55% 88%;
+    --accent-foreground: 220 60% 15%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 25% 88%;
+    --input: 220 25% 88%;
+    --ring: 220 75% 35%;
+    --radius: 0.25rem;
+    --chart-1: 220 75% 38%;
+    --chart-2: 195 65% 42%;
+    --chart-3:  35 80% 48%;
+    --chart-4: 345 55% 45%;
+    --chart-5: 260 40% 50%;
+  }
+
   .cyberpunk {
     color-scheme: dark;
     /* Palette: near-black bg, neon yellow primary, cyan accent, magenta destructive */
@@ -158,6 +218,44 @@
       rgba(0, 0, 0, 0) 2px,
       rgba(0, 0, 0, 0.04) 3px,
       rgba(0, 0, 0, 0) 4px
+    );
+    z-index: 10;
+  }
+
+  /* Emerald: faint film-grain noise overlay for an organic, breathing texture */
+  .emerald body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(
+        circle at 50% 50%,
+        rgba(255, 255, 255, 0.025) 0%,
+        rgba(255, 255, 255, 0) 60%
+      ),
+      repeating-radial-gradient(
+        circle at 25% 25%,
+        rgba(255, 255, 255, 0.012) 0px,
+        rgba(255, 255, 255, 0.012) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    z-index: 10;
+  }
+
+  /* Navy: faint vertical pinstripe overlay for engraved-stationery feel */
+  .navy body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      to right,
+      rgba(0, 0, 30, 0) 0px,
+      rgba(0, 0, 30, 0) 3px,
+      rgba(0, 0, 30, 0.022) 4px,
+      rgba(0, 0, 30, 0) 5px
     );
     z-index: 10;
   }
