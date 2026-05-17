@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.category import Category
 from app.models.fx_rate import FxRate
 from app.models.transaction import Transaction
-from app.schemas.forecast import DailyCumulativeResponse, DailyPoint
+from app.schemas.forecast import DailyCumulativeResponse, DailyPoint, MonthlyBucketsResponse, MonthlyPoint
 from app.services import settings_service
 from app.services.transaction_service import _compute_base_amount, _load_rates_for
 
@@ -395,4 +395,175 @@ def daily_cumulative(
         today=today,
         forecast_available=has_forecast,
         points=points,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Step 7 – monthly_buckets composition
+# ---------------------------------------------------------------------------
+
+_HORIZON_MONTHS = {"1m": 1, "3m": 3, "6m": 6, "1y": 12, "2y": 24}
+
+
+def _month_label(d: date) -> str:
+    return f"{d.year:04d}-{d.month:02d}"
+
+
+def _add_months(label: str, n: int) -> str:
+    y, m = (int(p) for p in label.split("-"))
+    total = y * 12 + (m - 1) + n
+    return f"{total // 12:04d}-{(total % 12) + 1:02d}"
+
+
+def _split_centered(horizon_months: int) -> tuple[int, int]:
+    """Return (past_count, future_count); current month is always 1.
+    Total slots = horizon_months. past_count + 1 + future_count == horizon_months."""
+    if horizon_months <= 1:
+        return (0, 0)
+    remaining = horizon_months - 1
+    past = remaining // 2
+    future = remaining - past
+    return (past, future)
+
+
+def _split_forward(horizon_months: int) -> tuple[int, int]:
+    """Forward-only: all future plus the current month."""
+    if horizon_months <= 1:
+        return (0, 0)
+    return (0, horizon_months - 1)
+
+
+def _monthly_actual_total_eur(
+    db: Session, *, user_id: int, month: str, category_id: int | None,
+) -> Decimal:
+    """Sum expense over a calendar month in EUR (FX-converted)."""
+    first, last = _month_bounds(month)
+    stmt = (
+        select(Transaction)
+        .join(Category, Category.id == Transaction.category_id)
+        .where(
+            and_(
+                Transaction.user_id == user_id,
+                Transaction.date >= first,
+                Transaction.date <= last,
+                Category.kind == "expense",
+            )
+        )
+    )
+    if category_id is not None:
+        stmt = stmt.where(Transaction.category_id == category_id)
+    rows = list(db.execute(stmt).scalars().all())
+
+    currencies = {t.currency for t in rows} | {_BASE_CURRENCY}
+    dates = {t.date for t in rows}
+    rates = _load_rates_for(db, currencies, dates)
+
+    total = Decimal(0)
+    for t in rows:
+        base_amount = _compute_base_amount(
+            amount=t.amount,
+            currency=t.currency,
+            when=t.date,
+            base_currency=_BASE_CURRENCY,
+            rate_for=rates,
+        )
+        if base_amount is None:
+            continue
+        total += base_amount
+    return total
+
+
+def _future_month_total_eur(
+    db: Session, *, user_id: int, today: date, category_id: int | None,
+) -> Decimal:
+    """Projected total spend for a single future month in EUR — per-category
+    projected monthly totals summed."""
+    cat_stmt = select(Category).where(
+        Category.user_id == user_id, Category.kind == "expense",
+    )
+    if category_id is not None:
+        cat_stmt = cat_stmt.where(Category.id == category_id)
+    total = Decimal(0)
+    for cat in db.execute(cat_stmt).scalars().all():
+        total += projected_monthly_total(
+            db, user_id=user_id, category_id=cat.id, as_of=today,
+        )
+    return total
+
+
+def monthly_buckets(
+    db: Session,
+    *,
+    user_id: int,
+    horizon: str,
+    mode: str,
+    today: date,
+    category_id: int | None = None,
+) -> MonthlyBucketsResponse:
+    """One bucket per month over `horizon`. Past months are actual totals;
+    future months are forecast totals; current month is split into actual MTD
+    + forecast remainder. EUR internally; converted to user's base currency
+    at response boundary."""
+    if horizon not in _HORIZON_MONTHS:
+        raise ValueError(f"unknown horizon: {horizon!r}")
+    if mode not in ("centered", "forward"):
+        raise ValueError(f"unknown mode: {mode!r}")
+
+    months_count = _HORIZON_MONTHS[horizon]
+    past_n, future_n = (
+        _split_centered(months_count) if mode == "centered"
+        else _split_forward(months_count)
+    )
+
+    current_label = _month_label(today)
+    labels = (
+        [_add_months(current_label, -(past_n - i)) for i in range(past_n)]
+        + [current_label]
+        + [_add_months(current_label, i + 1) for i in range(future_n)]
+    )
+
+    base_currency = settings_service.get_settings(db).base_currency
+    factor = _eur_to_base_factor(db, base_currency=base_currency, on=today) or Decimal("1")
+    has_forecast = forecast_available(db, user_id=user_id, as_of=today)
+
+    points: list[MonthlyPoint] = []
+    for label in labels:
+        if label < current_label:
+            total_eur = _monthly_actual_total_eur(
+                db, user_id=user_id, month=label, category_id=category_id,
+            )
+            points.append(MonthlyPoint(
+                month=label,
+                total=(total_eur * factor).quantize(Decimal("0.01")),
+                kind="past",
+            ))
+        elif label == current_label:
+            # Reuse daily_cumulative for the current month so the split is
+            # consistent with the daily view.
+            daily = daily_cumulative(
+                db, user_id=user_id, month=label, today=today,
+                category_id=category_id,
+            )
+            today_pt = next(p for p in daily.points if p.date == today)
+            last_pt = daily.points[-1]
+            mtd = today_pt.cumulative
+            total = last_pt.cumulative
+            remainder = (total - mtd).quantize(Decimal("0.01"))
+            points.append(MonthlyPoint(
+                month=label, total=total, actual_mtd=mtd,
+                forecast_remainder=remainder, kind="current",
+            ))
+        else:
+            future_eur = _future_month_total_eur(
+                db, user_id=user_id, today=today, category_id=category_id,
+            ) if has_forecast else Decimal(0)
+            points.append(MonthlyPoint(
+                month=label,
+                total=(future_eur * factor).quantize(Decimal("0.01")),
+                kind="future",
+            ))
+
+    return MonthlyBucketsResponse(
+        horizon=horizon, mode=mode, base_currency=base_currency,
+        today=today, forecast_available=has_forecast, points=points,
     )

@@ -333,3 +333,112 @@ def test_daily_cumulative_category_filter(db_session):
     )
     today_pt = next(p for p in resp.points if p.date == today)
     assert today_pt.cumulative == Decimal("10")  # fuel excluded
+
+
+# ---------------------------------------------------------------------------
+# Step 7 – monthly_buckets
+# ---------------------------------------------------------------------------
+
+def test_monthly_buckets_centered_3m(db_session):
+    settings_service.set_base_currency(db_session, "EUR")
+    today = date(2026, 5, 16)
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+
+    db_session.add_all([
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("100"),
+                    currency="EUR", date=date(2026, 3, 10), description=""),
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("200"),
+                    currency="EUR", date=date(2026, 4, 10), description=""),
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("50"),
+                    currency="EUR", date=date(2026, 5, 10), description=""),
+    ])
+    db_session.commit()
+
+    resp = forecast_service.monthly_buckets(
+        db_session, user_id=1, horizon="3m", mode="centered", today=today,
+    )
+
+    months = [p.month for p in resp.points]
+    assert months == ["2026-04", "2026-05", "2026-06"]
+
+    apr = next(p for p in resp.points if p.month == "2026-04")
+    assert apr.kind == "past"
+    assert apr.total == Decimal("200.00")
+    assert apr.actual_mtd is None
+    assert apr.forecast_remainder is None
+
+    may = next(p for p in resp.points if p.month == "2026-05")
+    assert may.kind == "current"
+    assert may.actual_mtd == Decimal("50.00")
+    assert may.forecast_remainder is not None
+    assert may.total == may.actual_mtd + may.forecast_remainder
+
+    jun = next(p for p in resp.points if p.month == "2026-06")
+    assert jun.kind == "future"
+    assert jun.actual_mtd is None
+    assert jun.forecast_remainder is None
+
+
+def test_monthly_buckets_forward_mode_skews_future(db_session):
+    settings_service.set_base_currency(db_session, "EUR")
+    today = date(2026, 5, 16)
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+
+    resp = forecast_service.monthly_buckets(
+        db_session, user_id=1, horizon="6m", mode="forward", today=today,
+    )
+    months = [p.month for p in resp.points]
+    # 6m forward: 0 past + current + 5 future.
+    assert months == [
+        "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10",
+    ]
+
+
+def test_monthly_buckets_2y_centered_has_24_points(db_session):
+    settings_service.set_base_currency(db_session, "EUR")
+    today = date(2026, 5, 16)
+
+    resp = forecast_service.monthly_buckets(
+        db_session, user_id=1, horizon="2y", mode="centered", today=today,
+    )
+    assert len(resp.points) == 24
+    # 24 points centered: 11 past + current + 12 future (past = (24-1)//2 = 11).
+    current_idx = next(i for i, p in enumerate(resp.points) if p.kind == "current")
+    assert current_idx == 11
+
+
+def test_monthly_buckets_rejects_unknown_horizon(db_session):
+    today = date(2026, 5, 16)
+    try:
+        forecast_service.monthly_buckets(
+            db_session, user_id=1, horizon="bogus", mode="centered", today=today,
+        )
+    except ValueError as e:
+        assert "horizon" in str(e)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_monthly_buckets_category_filter(db_session):
+    settings_service.set_base_currency(db_session, "EUR")
+    today = date(2026, 5, 16)
+    food = Category(name="Food", kind="expense", user_id=1)
+    fuel = Category(name="Fuel", kind="expense", user_id=1)
+    db_session.add_all([food, fuel]); db_session.commit()
+
+    db_session.add_all([
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("20"),
+                    currency="EUR", date=date(2026, 4, 1), description=""),
+        Transaction(user_id=1, category_id=fuel.id, amount=Decimal("80"),
+                    currency="EUR", date=date(2026, 4, 1), description=""),
+    ])
+    db_session.commit()
+
+    resp = forecast_service.monthly_buckets(
+        db_session, user_id=1, horizon="3m", mode="centered", today=today,
+        category_id=food.id,
+    )
+    apr = next(p for p in resp.points if p.month == "2026-04")
+    assert apr.total == Decimal("20.00")  # fuel excluded
