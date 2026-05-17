@@ -16,8 +16,20 @@ vi.mock("recharts", async () => {
     AreaChart: ({ children }: { children: React.ReactNode }) => (
       <g>{children}</g>
     ),
-    BarChart: ({ children }: { children: React.ReactNode }) => (
-      <g>{children}</g>
+    // BarChart renders a data-driven tick list so tests can assert on axis labels.
+    BarChart: ({
+      children,
+      data,
+    }: {
+      children: React.ReactNode;
+      data?: Array<Record<string, unknown>>;
+    }) => (
+      <g>
+        {data?.map((d, i) => (
+          <text key={i} data-testid="bar-tick">{String(d.label ?? "")}</text>
+        ))}
+        {children}
+      </g>
     ),
     Area: () => null,
     Bar: () => null,
@@ -56,5 +68,33 @@ describe("ForecastChart daily mode", () => {
     );
     // Recharts renders an SVG. Confirm one is present.
     expect(container.querySelector("svg")).not.toBeNull();
+  });
+});
+
+describe("ForecastChart monthly mode", () => {
+  it("renders bars for past, current (split), and future months", () => {
+    const { container } = render(
+      wrap(
+        <ForecastChart
+          mode="monthly"
+          monthly={{
+            horizon: "3m",
+            mode: "centered",
+            base_currency: "EUR",
+            today: "2026-05-16",
+            forecast_available: true,
+            points: [
+              { month: "2026-04", total: "200", actual_mtd: null, forecast_remainder: null, kind: "past" },
+              { month: "2026-05", total: "300", actual_mtd: "160", forecast_remainder: "140", kind: "current" },
+              { month: "2026-06", total: "250", actual_mtd: null, forecast_remainder: null, kind: "future" },
+            ],
+          }}
+        />,
+      ),
+    );
+    expect(container.querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("Apr")).toBeInTheDocument();
+    expect(screen.getByText("May")).toBeInTheDocument();
+    expect(screen.getByText("Jun")).toBeInTheDocument();
   });
 });
