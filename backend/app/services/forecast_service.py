@@ -87,3 +87,88 @@ def actual_mtd(
         out[d] = running
         d += timedelta(days=1)
     return out
+
+
+_PROFILE_TRAILING_MONTHS = 6
+
+
+def _months_ago(d: date, months: int) -> date:
+    """Subtract `months` calendar months from `d`, clamping the day to the
+    target month's last valid day."""
+    y, m = d.year, d.month - months
+    while m <= 0:
+        m += 12
+        y -= 1
+    last = monthrange(y, m)[1]
+    return date(y, m, min(d.day, last))
+
+
+def day_of_month_profile(
+    db: Session,
+    *,
+    user_id: int,
+    category_id: int,
+    as_of: date,
+) -> list[Decimal]:
+    """Normalised 31-element distribution of how this category's expense
+    spreads across days-of-month, averaged over the trailing 6 months ending
+    the day before `as_of`. Smoothed with a 3-day centered moving average,
+    re-normalised to sum to 1.
+
+    Returns a flat 1/31 distribution when the category has no expense history
+    in the window (cold-start fallback).
+
+    Amounts are converted to EUR via the FxRate pivot before being binned.
+    Missing FX rates are skipped (consistent with `actual_mtd`).
+    """
+    window_start = _months_ago(as_of, _PROFILE_TRAILING_MONTHS)
+    window_end = as_of - timedelta(days=1)
+
+    stmt = (
+        select(Transaction)
+        .join(Category, Category.id == Transaction.category_id)
+        .where(
+            and_(
+                Transaction.user_id == user_id,
+                Transaction.category_id == category_id,
+                Category.kind == "expense",
+                Transaction.date >= window_start,
+                Transaction.date <= window_end,
+            )
+        )
+    )
+    rows = list(db.execute(stmt).scalars().all())
+
+    currencies = {t.currency for t in rows} | {_BASE_CURRENCY}
+    dates = {t.date for t in rows}
+    rates = _load_rates_for(db, currencies, dates)
+
+    raw = [Decimal(0)] * 31
+    for t in rows:
+        base_amount = _compute_base_amount(
+            amount=t.amount,
+            currency=t.currency,
+            when=t.date,
+            base_currency=_BASE_CURRENCY,
+            rate_for=rates,
+        )
+        if base_amount is None:
+            continue
+        idx = min(t.date.day, 31) - 1
+        raw[idx] += base_amount
+
+    total = sum(raw)
+    if total <= 0:
+        return [Decimal(1) / 31] * 31
+
+    # Weighted 3-day centered moving average (1:2:1); clamp at boundaries.
+    # Centre weight is doubled so isolated-day peaks remain above their neighbours.
+    smoothed: list[Decimal] = []
+    for i in range(31):
+        a = raw[max(0, i - 1)]
+        b = raw[i]
+        c = raw[min(30, i + 1)]
+        smoothed.append((a + 2 * b + c) / 4)
+
+    s = sum(smoothed)
+    return [v / s for v in smoothed]
