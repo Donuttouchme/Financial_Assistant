@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from app.services import forecast_service
@@ -129,3 +129,62 @@ def test_day_of_month_profile_ignores_other_users(db_session):
     )
     # No user-1 data → flat.
     assert all(abs(p - Decimal("1") / 31) < Decimal("0.001") for p in profile)
+
+
+def test_projected_monthly_total_extrapolates_trailing_window(db_session):
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+
+    # 900 EUR over the past 90 days = 10 EUR/day = 300 EUR/month.
+    db_session.add_all([
+        Transaction(user_id=1, category_id=food.id, amount=Decimal("10"),
+                    currency="EUR",
+                    date=date(2026, 5, 1) - timedelta(days=i + 1),
+                    description="")
+        for i in range(90)
+    ])
+    db_session.commit()
+
+    total = forecast_service.projected_monthly_total(
+        db_session, user_id=1, category_id=food.id, as_of=date(2026, 5, 1),
+    )
+
+    # 90 * 10 / 90 * 30 = 300, but the trailing window excludes today so we
+    # accept a small drift due to month-end boundary effects.
+    assert abs(total - Decimal("300")) < Decimal("1")
+
+
+def test_projected_monthly_total_zero_when_no_history(db_session):
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+
+    total = forecast_service.projected_monthly_total(
+        db_session, user_id=1, category_id=food.id, as_of=date(2026, 5, 1),
+    )
+    assert total == Decimal(0)
+
+
+def test_projected_monthly_total_scopes_by_user_and_category(db_session):
+    food1 = Category(name="Food", kind="expense", user_id=1)
+    fuel1 = Category(name="Fuel", kind="expense", user_id=1)
+    food2 = Category(name="Food", kind="expense", user_id=2)
+    db_session.add_all([food1, fuel1, food2]); db_session.commit()
+
+    db_session.add_all([
+        # User 1 / Food: 30 EUR
+        Transaction(user_id=1, category_id=food1.id, amount=Decimal("30"),
+                    currency="EUR", date=date(2026, 4, 15), description=""),
+        # User 1 / Fuel: 100 EUR (must NOT leak into Food projection)
+        Transaction(user_id=1, category_id=fuel1.id, amount=Decimal("100"),
+                    currency="EUR", date=date(2026, 4, 15), description=""),
+        # User 2 / Food: 999 EUR (must NOT leak into user-1 projection)
+        Transaction(user_id=2, category_id=food2.id, amount=Decimal("999"),
+                    currency="EUR", date=date(2026, 4, 15), description=""),
+    ])
+    db_session.commit()
+
+    total = forecast_service.projected_monthly_total(
+        db_session, user_id=1, category_id=food1.id, as_of=date(2026, 5, 1),
+    )
+    # 30 EUR over 90-day window: rate 30/90 = 1/3 EUR/day * 30 days = 10 EUR/month.
+    assert abs(total - Decimal("10")) < Decimal("0.1")

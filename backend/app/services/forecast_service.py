@@ -172,3 +172,62 @@ def day_of_month_profile(
 
     s = sum(smoothed)
     return [v / s for v in smoothed]
+
+
+_PROJECTION_WINDOW_DAYS = 90
+_PROJECTION_MONTH_DAYS = 30  # Standardised "month length".
+
+
+def projected_monthly_total(
+    db: Session,
+    *,
+    user_id: int,
+    category_id: int,
+    as_of: date,
+) -> Decimal:
+    """Project this category's monthly spend (in EUR) from the trailing 90
+    days ending the day before `as_of`. Includes recurring AND ad-hoc — the
+    day-of-month profile handles intra-month timing separately, so there is
+    no need to disambiguate.
+
+    Returns 0 when the category has no history in the window.
+    """
+    window_start = as_of - timedelta(days=_PROJECTION_WINDOW_DAYS)
+    window_end = as_of - timedelta(days=1)
+
+    stmt = (
+        select(Transaction)
+        .join(Category, Category.id == Transaction.category_id)
+        .where(
+            and_(
+                Transaction.user_id == user_id,
+                Transaction.category_id == category_id,
+                Category.kind == "expense",
+                Transaction.date >= window_start,
+                Transaction.date <= window_end,
+            )
+        )
+    )
+    rows = list(db.execute(stmt).scalars().all())
+    if not rows:
+        return Decimal(0)
+
+    currencies = {t.currency for t in rows} | {_BASE_CURRENCY}
+    dates = {t.date for t in rows}
+    rates = _load_rates_for(db, currencies, dates)
+
+    total = Decimal(0)
+    for t in rows:
+        base_amount = _compute_base_amount(
+            amount=t.amount,
+            currency=t.currency,
+            when=t.date,
+            base_currency=_BASE_CURRENCY,
+            rate_for=rates,
+        )
+        if base_amount is None:
+            continue
+        total += base_amount
+
+    rate_per_day = total / _PROJECTION_WINDOW_DAYS
+    return rate_per_day * _PROJECTION_MONTH_DAYS
