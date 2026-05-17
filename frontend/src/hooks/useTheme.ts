@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 
-type Theme = "light" | "dark" | "sakura" | "cyberpunk";
+type Theme = "light" | "dark" | "sakura" | "cyberpunk" | "emerald" | "navy";
 const STORAGE_KEY = "fa-theme";
-const VALID: Theme[] = ["light", "dark", "sakura", "cyberpunk"];
+const VALID: Theme[] = ["light", "dark", "sakura", "cyberpunk", "emerald", "navy"];
 
 // Per-theme favicon. Browsers don't apply page CSS to linked favicons, so we
 // emit one SVG per theme with the accent color baked in and swap the <link>
 // href when the theme changes. The shape matches frontend/public/favicon.svg.
 const FAVICON_COLORS: Record<Theme, string> = {
-  light:     "#0f0f12", // near-black
-  dark:      "#fafafa", // near-white
-  sakura:    "#e35d8a", // sakura primary pink
-  cyberpunk: "#fcee0a", // neon yellow
+  light:     "#0f0f12",
+  dark:      "#fafafa",
+  sakura:    "#e35d8a",
+  cyberpunk: "#fcee0a",
+  emerald:   "#3eba83",
+  navy:      "#143d7a",
 };
 
 function faviconSvg(color: string): string {
@@ -52,7 +54,7 @@ export function useTheme() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove("dark", "sakura", "cyberpunk");
+    root.classList.remove("dark", "sakura", "cyberpunk", "emerald", "navy");
     if (theme !== "light") root.classList.add(theme);
     window.localStorage.setItem(STORAGE_KEY, theme);
     applyFavicon(theme);
