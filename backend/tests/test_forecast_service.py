@@ -279,6 +279,25 @@ def test_forecast_available_ignores_other_users(db_session):
     ) is False
 
 
+def test_forecast_available_false_when_history_outside_projection_window(db_session):
+    """Aligns availability with the projection window: an expense from 200
+    days ago can't drive a projection (projected_monthly_total uses a 90-day
+    window), so the empty-state placeholder should still show. Previously
+    `forecast_available` used a 365-day window and produced a flat-line chart
+    that looked broken."""
+    food = Category(name="Food", kind="expense", user_id=1)
+    db_session.add(food); db_session.commit()
+    db_session.add(Transaction(
+        user_id=1, category_id=food.id, amount=Decimal("50"),
+        currency="EUR", date=date(2026, 5, 1) - timedelta(days=200),
+        description="",
+    ))
+    db_session.commit()
+    assert forecast_service.forecast_available(
+        db_session, user_id=1, as_of=date(2026, 5, 1),
+    ) is False
+
+
 # ---------------------------------------------------------------------------
 # Step 6.3 – daily_cumulative
 # ---------------------------------------------------------------------------

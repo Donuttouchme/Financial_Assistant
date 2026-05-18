@@ -241,9 +241,11 @@ def projected_monthly_total(
 # ---------------------------------------------------------------------------
 
 def expense_history_days(db: Session, *, user_id: int, as_of: date) -> int:
-    """Distinct days in the trailing 365 days on which this user recorded
-    any expense transaction."""
-    window_start = as_of - timedelta(days=365)
+    """Distinct days within the projection lookback (_PROJECTION_WINDOW_DAYS)
+    on which this user recorded any expense transaction. Aligned to the
+    projection window so `forecast_available` and `projected_monthly_total`
+    agree — older history can't drive a projection."""
+    window_start = as_of - timedelta(days=_PROJECTION_WINDOW_DAYS)
     stmt = (
         select(Transaction.date)
         .join(Category, Category.id == Transaction.category_id)
