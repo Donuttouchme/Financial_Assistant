@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { CurrencySection } from "@/components/settings/CurrencySection";
 import { FxSection } from "@/components/settings/FxSection";
 import { AppearanceSection } from "@/components/settings/AppearanceSection";
+import { BackupSection } from "@/components/settings/BackupSection";
 
 export default function SettingsPage() {
   return (
@@ -32,6 +33,15 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <AppearanceSection />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h3 className="text-2xl font-semibold leading-none tracking-tight">Backup &amp; restore</h3>
+        </CardHeader>
+        <CardContent>
+          <BackupSection />
         </CardContent>
       </Card>
     </div>

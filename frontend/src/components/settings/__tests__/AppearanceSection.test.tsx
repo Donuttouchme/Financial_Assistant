@@ -5,16 +5,17 @@ import { AppearanceSection } from "@/components/settings/AppearanceSection";
 
 describe("AppearanceSection", () => {
   beforeEach(() => {
-    document.documentElement.classList.remove("dark", "sakura", "cyberpunk");
+    document.documentElement.classList.remove(
+      "dark", "sakura", "cyberpunk", "emerald", "navy",
+    );
     window.localStorage.clear();
   });
 
-  it("has 4 theme cards", () => {
+  it("has 6 theme cards", () => {
     render(<AppearanceSection />);
-    expect(screen.getByRole("radio", { name: /light/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /dark/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /sakura/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /cyberpunk/i })).toBeInTheDocument();
+    for (const name of [/light/i, /dark/i, /sakura/i, /cyberpunk/i, /emerald/i, /navy/i]) {
+      expect(screen.getByRole("radio", { name })).toBeInTheDocument();
+    }
   });
 
   it("clicking a card applies that theme", async () => {

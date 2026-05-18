@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -12,6 +12,10 @@ from app.services.currencies import SUPPORTED_CURRENCIES
 
 _SINGLETON_ID = 1
 _TWO_PLACES = Decimal("0.01")
+# Frankfurter only publishes business-day rates. On a weekend the
+# `today` row is absent — fall back to the most recent available row up to
+# this many days back. Keeps weekend base-currency changes from 409-ing.
+_FX_FALLBACK_DAYS = 7
 
 
 class FxNotAvailableError(RuntimeError):
@@ -39,19 +43,30 @@ def set_base_currency(db: Session, new_base: str) -> Settings:
     return s
 
 
+def _rate_with_fallback(
+    db: Session, currency: str, when: date, *, max_days_back: int = _FX_FALLBACK_DAYS,
+) -> Decimal | None:
+    """Return the FX rate for ``currency`` on the most recent date at or before
+    ``when``, within ``max_days_back`` days. Returns None when no row exists in
+    the window. Bridges Frankfurter's weekend/holiday gaps."""
+    if currency == "EUR":
+        return Decimal("1.0")
+    for delta in range(max_days_back + 1):
+        d = when - timedelta(days=delta)
+        row = db.execute(
+            select(FxRate.rate_to_eur).where(FxRate.currency == currency, FxRate.date == d)
+        ).scalar_one_or_none()
+        if row is not None:
+            return row
+    return None
+
+
 def _convert(amount: Decimal, old_base: str, new_base: str, db: Session, when: date) -> Decimal:
     if old_base == new_base:
         return amount.quantize(_TWO_PLACES)
 
-    def rate(code: str) -> Decimal | None:
-        if code == "EUR":
-            return Decimal("1.0")
-        return db.execute(
-            select(FxRate.rate_to_eur).where(FxRate.currency == code, FxRate.date == when)
-        ).scalar_one_or_none()
-
-    r_old = rate(old_base)
-    r_new = rate(new_base)
+    r_old = _rate_with_fallback(db, old_base, when)
+    r_new = _rate_with_fallback(db, new_base, when)
     # rate_to_eur(X) is "1 EUR = X currency-units" (frankfurter convention),
     # so converting old -> new is: amount * r_new / r_old.
     if r_old is None or r_new is None or r_old == 0:
@@ -142,4 +157,11 @@ def commit_base_currency_change(db: Session, new_base: str, user_id: int) -> Set
     for c, new_amount in goal_updates:
         c.target_amount = new_amount
 
-    return set_base_currency(db, code)
+    try:
+        return set_base_currency(db, code)
+    except Exception:
+        # Roll back so the dirty in-memory budget/goal mutations don't survive
+        # in the session after a commit failure. SQLAlchemy expires all objects
+        # on rollback, so the next read re-fetches from the DB.
+        db.rollback()
+        raise

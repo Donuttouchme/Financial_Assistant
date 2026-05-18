@@ -28,6 +28,7 @@ export function useUpdateBaseCurrency() {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["budgets"] });
       qc.invalidateQueries({ queryKey: ["categories"] });
+      qc.invalidateQueries({ queryKey: ["forecast"] });
       toast.success("Base currency updated");
     },
     onError: (err) => {

@@ -54,6 +54,26 @@ const SWATCHES: Swatch[] = [
       accent: "hsl(187 100% 50%)",
     },
   },
+  {
+    key: "emerald",
+    label: "Emerald",
+    preview: {
+      background: "hsl(155 25% 7%)",
+      foreground: "hsl(150 15% 92%)",
+      primary: "hsl(152 55% 48%)",
+      accent: "hsl(175 50% 35%)",
+    },
+  },
+  {
+    key: "navy",
+    label: "Navy",
+    preview: {
+      background: "hsl(220 30% 98%)",
+      foreground: "hsl(220 60% 15%)",
+      primary: "hsl(220 75% 28%)",
+      accent: "hsl(195 55% 88%)",
+    },
+  },
 ];
 
 export function AppearanceSection() {

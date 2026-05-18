@@ -162,6 +162,109 @@ def test_commit_with_config_default_currency(client):
     assert txs[0]["currency"] == "CHF"
 
 
+def test_preview_does_not_flag_opposite_sign_as_duplicate(client):
+    """A +45.30 income and a -45.30 expense on the same date+description are NOT duplicates."""
+    income_cat = _seed_category(client, name="Salary", kind="income")
+    # Seed an income transaction: amount stored as +45.30, kind=income.
+    client.post(
+        "/api/transactions",
+        json={
+            "amount": "45.30",
+            "date": "2026-05-01",
+            "category_id": income_cat["id"],
+            "description": "lunch",
+        },
+    )
+    # CSV preview row is a -45.30 expense (signed amount).
+    payload = {
+        "file_content": "2026-05-01;lunch;-45.30\n",
+        "config": {**_BASE_CONFIG},
+    }
+    r = client.post("/api/import/preview", json=payload)
+    assert r.status_code == 200
+    body = r.json()
+    # Sign differs (existing tx is income +45.30; row is expense -45.30) — must NOT dupe.
+    assert body["rows"][0]["is_duplicate"] is False
+
+
+def test_preview_flags_same_sign_dupes_regression_guard(client):
+    """Same-date, same-description, same SIGN amounts still flagged as duplicates."""
+    expense_cat = _seed_category(client, kind="expense")
+    # Seed an expense: stored as +45.30 with kind=expense → signed = -45.30.
+    client.post(
+        "/api/transactions",
+        json={
+            "amount": "45.30",
+            "date": "2026-05-01",
+            "category_id": expense_cat["id"],
+            "description": "lunch",
+        },
+    )
+    # Preview a CSV row that is -45.30 expense — same signed amount.
+    payload = {
+        "file_content": "2026-05-01;lunch;-45.30\n",
+        "config": {**_BASE_CONFIG},
+    }
+    r = client.post("/api/import/preview", json=payload)
+    body = r.json()
+    assert body["rows"][0]["is_duplicate"] is True
+
+
+def test_commit_sets_fx_missing_dates_header_when_rates_unavailable(client, monkeypatch):
+    """If FX prefetch can't get rates for some dates, response has X-Fx-Missing-Dates header."""
+    from app.services import fx_service
+
+    async def empty_fetch(target):
+        # Frankfurter unreachable / returns nothing — no rates upserted.
+        return {}
+
+    monkeypatch.setattr(fx_service, "fetch_rates_for_date", empty_fetch)
+
+    cat = _seed_category(client, kind="income")
+    payload = {
+        "file_content": (
+            "2026-05-14;bonus;20.00\n"
+            "2026-05-15;tip;1.00\n"
+        ),
+        "config": {**_BASE_CONFIG},
+        "selections": [
+            {"row_index": 0, "category_id": cat["id"], "is_recurring": False},
+            {"row_index": 1, "category_id": cat["id"], "is_recurring": False},
+        ],
+        "default_currency": "USD",
+    }
+    r = client.post("/api/import/commit", json=payload)
+    assert r.status_code == 200
+    header = r.headers.get("X-Fx-Missing-Dates")
+    assert header is not None
+    missing = set(header.split(","))
+    assert missing == {"2026-05-14", "2026-05-15"}
+
+
+def test_commit_omits_fx_missing_dates_header_when_rates_present(client, monkeypatch):
+    """When prefetch fills every date, response must NOT carry the missing-dates header."""
+    from decimal import Decimal as _D
+    from app.services import fx_service
+
+    async def good_fetch(target):
+        return {"EUR": _D("1.0"), "USD": _D("1.08"), "CHF": _D("0.96")}
+
+    monkeypatch.setattr(fx_service, "fetch_rates_for_date", good_fetch)
+
+    cat = _seed_category(client, kind="income")
+    payload = {
+        "file_content": "2026-05-14;bonus;20.00\n",
+        "config": {**_BASE_CONFIG},
+        "selections": [
+            {"row_index": 0, "category_id": cat["id"], "is_recurring": False},
+        ],
+        "default_currency": "USD",
+    }
+    r = client.post("/api/import/commit", json=payload)
+    assert r.status_code == 200
+    assert "X-Fx-Missing-Dates" not in r.headers
+
+
 def test_commit_eager_fills_fx_rates_for_each_unique_date(client, monkeypatch):
     """commit_import should call fetch_rates_for_date once per unique row date."""
     from datetime import date

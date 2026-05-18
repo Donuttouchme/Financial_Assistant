@@ -18,15 +18,17 @@ REM Ensure dirs exist.
 if not exist "%APPDATA%\FinancialAssistant" mkdir "%APPDATA%\FinancialAssistant"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
-REM Record invocation. Locale-dependent date/time format is acceptable here;
-REM start.ps1 writes ISO-format timestamps for the detailed log lines.
+:relaunch
 echo [%date% %time%] RUN.bat invoked. INSTALL_DIR=%INSTALL_DIR% >> "%LAUNCHER_LOG%"
 
-REM Run start.ps1. Redirect PS-level stderr to powershell-error.log so launcher
-REM failures that prevent start.ps1 from reaching its own logger still leave a
-REM trace (execution policy block, syntax error, missing file, etc.).
 powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%INSTALL_DIR%app-scripts\start.ps1" -PythonExe "%PYTHON_EXE%" -BackendDir "%INSTALL_DIR%backend" 2>> "%PS_ERR_LOG%"
 set "PS_EXIT=%errorlevel%"
 
 echo [%date% %time%] RUN.bat done. PowerShell exit code: %PS_EXIT% >> "%LAUNCHER_LOG%"
+
+if "%PS_EXIT%"=="75" (
+    echo [%date% %time%] Restart-required exit code; relaunching >> "%LAUNCHER_LOG%"
+    goto relaunch
+)
+
 exit /b %PS_EXIT%

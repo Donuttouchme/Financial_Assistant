@@ -1,6 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
+import { parseHorizon } from "@/lib/forecastUrl";
 import type { ForecastHorizon } from "@/api/types";
 
 const OPTIONS: ForecastHorizon[] = ["1m", "3m", "6m", "1y", "2y"];
@@ -11,7 +12,7 @@ const LABEL: Record<ForecastHorizon, string> = {
 
 export function HorizonPicker() {
   const [search, setSearch] = useSearchParams();
-  const current = (search.get("horizon") as ForecastHorizon) || "6m";
+  const current = parseHorizon(search.get("horizon"));
 
   return (
     <div

@@ -20,6 +20,7 @@ _COLUMN_ADDS: list[tuple[str, str, str]] = [
     ("categories", "target_date", "DATE"),
     ("transactions", "currency", "TEXT NOT NULL DEFAULT 'CHF'"),
     ("recurring_schedules", "currency", "TEXT NOT NULL DEFAULT 'CHF'"),
+    ("transactions", "schedule_id", "INTEGER NULL"),
 ]
 
 

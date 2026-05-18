@@ -27,6 +27,7 @@ export function CategoriesList() {
 
   const income = (data ?? []).filter((c) => c.kind === "income");
   const expense = (data ?? []).filter((c) => c.kind === "expense");
+  const savings = (data ?? []).filter((c) => c.kind === "savings");
 
   function Section({ title, items }: { title: string; items: Category[] }) {
     return (
@@ -42,7 +43,11 @@ export function CategoriesList() {
               <div key={c.id} className="flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-2">
                   <span>{c.name}</span>
-                  <Badge variant={c.kind === "income" ? "default" : "secondary"}>
+                  <Badge variant={
+                    c.kind === "income" ? "default"
+                    : c.kind === "savings" ? "outline"
+                    : "secondary"
+                  }>
                     {c.kind}
                   </Badge>
                 </div>
@@ -66,6 +71,7 @@ export function CategoriesList() {
     <div className="space-y-6">
       <Section title="Income" items={income} />
       <Section title="Expense" items={expense} />
+      <Section title="Savings" items={savings} />
 
       <AlertDialog
         open={confirm !== null}

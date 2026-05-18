@@ -33,6 +33,7 @@ export function useDeleteCategory() {
       qc.invalidateQueries({ queryKey: KEY });
       qc.invalidateQueries({ queryKey: ["budgets"] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["forecast"] });
       toast.success("Category deleted");
     },
     onError: (err) =>

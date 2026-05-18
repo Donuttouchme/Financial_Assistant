@@ -141,6 +141,26 @@ export interface FxRefreshResponse {
   ok: boolean;
 }
 
+export interface RecurringSchedule {
+  id: number;
+  transaction_id: number;
+  amount: string;
+  category_id: number;
+  description: string;
+  currency: string;
+  start_date: string;
+  next_occurrence_date: string;
+  frequency: string;
+}
+
+export interface RecurringUpdate {
+  amount?: string;
+  category_id?: number;
+  description?: string;
+  currency?: string;
+  frequency?: string;
+}
+
 export interface ImportPreset {
   id: number;
   name: string;
@@ -163,6 +183,11 @@ export interface ImportCommitRowSelection {
 export interface ImportCommitResponse {
   imported: number;
   skipped: number;
+  // ISO date strings for which FX rates could not be fetched at commit time.
+  // Populated from the X-Fx-Missing-Dates response header; empty when
+  // frankfurter delivered everything. Affected transactions land with
+  // base_amount=null and self-correct on the next FX refresh.
+  missing_fx_dates: string[];
 }
 
 // ---------- Forecast ----------

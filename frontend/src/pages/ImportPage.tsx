@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,6 +20,7 @@ import { useSettings } from "@/hooks/queries/useSettings";
 import { previewCsv, commitImport } from "@/api/csv-import";
 import type {
   CsvImportConfig,
+  ImportCommitResponse,
   ImportCommitRowSelection,
   ParsedRow,
 } from "@/api/types";
@@ -39,13 +41,45 @@ export default function ImportPage() {
   const { data: categories } = useCategories();
   const createCategory = useCreateCategory();
   const { data: settings } = useSettings();
+  const qc = useQueryClient();
 
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [config, setConfig] = useState<CsvImportConfig>(DEFAULT_CONFIG);
   const [rows, setRows] = useState<ParsedRow[] | null>(null);
   const [selections, setSelections] = useState<ImportCommitRowSelection[]>([]);
-  const [committing, setCommitting] = useState(false);
   const [defaultCurrency, setDefaultCurrency] = useState<string>("CHF");
+
+  const commitMutation = useMutation<
+    ImportCommitResponse,
+    Error,
+    {
+      fileContent: string;
+      config: CsvImportConfig;
+      selections: ImportCommitRowSelection[];
+    }
+  >({
+    mutationFn: ({ fileContent, config, selections }) =>
+      commitImport(fileContent, config, selections),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["budgets"] });
+      qc.invalidateQueries({ queryKey: ["forecast"] });
+      toast.success(`Imported ${r.imported}, skipped ${r.skipped}`);
+      if (r.missing_fx_dates.length > 0) {
+        toast.warning(
+          `FX unavailable for ${r.missing_fx_dates.length} date(s). ` +
+            `Affected rows will fill in on the next rate refresh.`,
+          { duration: 10_000 },
+        );
+      }
+      setRows(null);
+      setFileContent(null);
+    },
+    onError: (e) => {
+      const msg = e instanceof Error ? e.message : "Import failed";
+      toast.error(msg);
+    },
+  });
 
   useEffect(() => {
     if (settings?.base_currency) {
@@ -85,23 +119,12 @@ export default function ImportPage() {
 
   async function handleCommit() {
     if (!fileContent || selections.length === 0) return;
-    setCommitting(true);
-    try {
-      await ensureImportedCategory();
-      const r = await commitImport(
-        fileContent,
-        { ...config, default_currency: defaultCurrency },
-        selections,
-      );
-      toast.success(`Imported ${r.imported}, skipped ${r.skipped}`);
-      setRows(null);
-      setFileContent(null);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Import failed";
-      toast.error(msg);
-    } finally {
-      setCommitting(false);
-    }
+    await ensureImportedCategory();
+    commitMutation.mutate({
+      fileContent,
+      config: { ...config, default_currency: defaultCurrency },
+      selections,
+    });
   }
 
   const importedCat = (categories ?? []).find((c) => c.name === "Imported");
@@ -174,9 +197,11 @@ export default function ImportPage() {
               </span>
               <Button
                 onClick={handleCommit}
-                disabled={selections.length === 0 || committing}
+                disabled={selections.length === 0 || commitMutation.isPending}
               >
-                {committing ? "Importing…" : `Import ${selections.length}`}
+                {commitMutation.isPending
+                  ? "Importing…"
+                  : `Import ${selections.length}`}
               </Button>
             </div>
           </CardContent>

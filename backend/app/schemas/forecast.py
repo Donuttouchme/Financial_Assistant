@@ -22,9 +22,9 @@ class DailyCumulativeResponse(BaseModel):
     month: str  # "YYYY-MM"
     base_currency: str  # 3-letter ISO
     today: date
-    # Whether the forecast tail was actually computed (False below the 30-day
-    # data threshold, in which case future-day points all have cumulative
-    # equal to the MTD-at-today value).
+    # True when the user has any expense activity within the projection
+    # lookback window (currently 90 days). False when too thin to project at
+    # all — the UI shows an empty-state placeholder instead of a flat line.
     forecast_available: bool
     points: list[DailyPoint]
 

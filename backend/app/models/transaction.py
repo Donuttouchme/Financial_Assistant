@@ -22,6 +22,22 @@ class Transaction(Base):
         String(3), nullable=False, default="CHF", server_default="CHF"
     )
     is_recurring: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # use_alter=True breaks the transactions <-> recurring_schedules FK cycle
+    # so Base.metadata.create_all / drop_all can order DDL correctly. On SQLite
+    # the ALTER is a no-op at column-creation time; the constraint still lives
+    # in CREATE TABLE for fresh DBs and is enforced at the SQLAlchemy session
+    # layer (ondelete=SET NULL) for existing DBs via the migration in
+    # app/migrations.py.
+    schedule_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "recurring_schedules.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_transactions_schedule_id",
+        ),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

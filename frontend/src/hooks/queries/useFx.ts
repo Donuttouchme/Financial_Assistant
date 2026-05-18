@@ -17,6 +17,7 @@ export function useRefreshFx() {
       qc.invalidateQueries({ queryKey: KEY });
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["budgets"] });
+      qc.invalidateQueries({ queryKey: ["forecast"] });
       if (data.ok) toast.success(`Rates refreshed (${data.currencies_updated} currencies)`);
       else toast.error("Rate refresh failed — check your connection");
     },

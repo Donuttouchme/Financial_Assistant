@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 
+import { parseCategoryId } from "@/lib/forecastUrl";
 import type { Category } from "@/api/types";
 
 interface Props {
@@ -8,7 +9,8 @@ interface Props {
 
 export function CategoryFilter({ categories }: Props) {
   const [search, setSearch] = useSearchParams();
-  const current = search.get("category") ?? "all";
+  const parsed = parseCategoryId(search.get("category"));
+  const current = parsed === undefined ? "all" : String(parsed);
 
   return (
     <label className="inline-flex items-center gap-2 text-sm">

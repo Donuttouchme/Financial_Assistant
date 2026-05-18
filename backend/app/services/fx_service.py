@@ -147,6 +147,16 @@ async def refresh_today(db: Session) -> tuple[date | None, int]:
     return (when, count)
 
 
-async def ensure_rates_for_dates(db: Session, dates: Iterable[date]) -> None:
-    for d in set(dates):
+async def ensure_rates_for_dates(db: Session, dates: Iterable[date]) -> list[date]:
+    """Eager-fill rates for each unique date. Returns dates still missing afterwards.
+
+    A date is reported missing if no FxRate row exists for it after the call
+    (i.e. fetch failed or returned an empty payload). Sorted ascending for
+    determinism.
+    """
+    unique = set(dates)
+    for d in unique:
         await ensure_rates_for_date(db, d)
+    missing = [d for d in unique if not _has_any_row_for_date(db, d)]
+    missing.sort()
+    return missing

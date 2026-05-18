@@ -7,6 +7,7 @@ import type {
   FxRefreshResponse,
   FxStatusRead,
   ImportPreset,
+  RecurringSchedule,
   SettingsRead,
   Transaction,
 } from "@/api/types";
@@ -16,11 +17,13 @@ export const testState = {
   transactions: [] as Transaction[],
   budgets: [] as BudgetRead[],
   importPresets: [] as ImportPreset[],
+  recurringSchedules: [] as RecurringSchedule[],
   settings: { base_currency: "CHF" } as SettingsRead,
   fxStatus: { latest_date: null, source: "frankfurter.dev", is_fresh: false } as FxStatusRead,
   nextCatId: 1,
   nextTxId: 1,
   nextPresetId: 1,
+  nextScheduleId: 1,
 };
 
 export function resetTestState() {
@@ -28,11 +31,13 @@ export function resetTestState() {
   testState.transactions = [];
   testState.budgets = [];
   testState.importPresets = [];
+  testState.recurringSchedules = [];
   testState.settings = { base_currency: "CHF" };
   testState.fxStatus = { latest_date: null, source: "frankfurter.dev", is_fresh: false };
   testState.nextCatId = 1;
   testState.nextTxId = 1;
   testState.nextPresetId = 1;
+  testState.nextScheduleId = 1;
 }
 
 function fakeDailyMay2026() {
@@ -169,6 +174,26 @@ export const handlers = [
     return HttpResponse.json(tx, { status: 201 });
   }),
 
+  http.put("/api/transactions/:id", async ({ params, request }) => {
+    const id = Number(params.id);
+    const idx = testState.transactions.findIndex((t) => t.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as Partial<{
+      amount: string; date: string; category_id: number;
+      description: string; is_recurring: boolean; currency: string;
+    }>;
+    const updated: Transaction = {
+      ...testState.transactions[idx],
+      ...body,
+      base_amount: body.amount ?? testState.transactions[idx].base_amount,
+      updated_at: new Date().toISOString(),
+    };
+    testState.transactions[idx] = updated;
+    return HttpResponse.json(updated);
+  }),
+
   http.delete("/api/transactions/:id", ({ params }) => {
     const id = Number(params.id);
     const idx = testState.transactions.findIndex((t) => t.id === id);
@@ -177,6 +202,28 @@ export const handlers = [
     }
     testState.transactions.splice(idx, 1);
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.put("/api/budgets/:categoryId", async ({ params, request }) => {
+    const categoryId = Number(params.categoryId);
+    const body = (await request.json()) as {
+      month: string; monthly_limit: string;
+    };
+    const existing = testState.budgets.find(
+      (b) => b.category_id === categoryId && b.month === body.month,
+    );
+    if (existing) {
+      existing.monthly_limit = body.monthly_limit;
+      return HttpResponse.json(existing);
+    }
+    const created: BudgetRead = {
+      id: testState.budgets.length + 1,
+      category_id: categoryId,
+      month: body.month,
+      monthly_limit: body.monthly_limit,
+    };
+    testState.budgets.push(created);
+    return HttpResponse.json(created, { status: 201 });
   }),
 
   http.get("/api/budgets", ({ request }) => {
@@ -263,6 +310,44 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
+  http.get("/api/recurring", () =>
+    HttpResponse.json(testState.recurringSchedules),
+  ),
+
+  http.get("/api/recurring/:id", ({ params }) => {
+    const id = Number(params.id);
+    const sched = testState.recurringSchedules.find((s) => s.id === id);
+    if (!sched) {
+      return HttpResponse.json({ detail: "schedule not found" }, { status: 404 });
+    }
+    return HttpResponse.json(sched);
+  }),
+
+  http.patch("/api/recurring/:id", async ({ params, request }) => {
+    const id = Number(params.id);
+    const idx = testState.recurringSchedules.findIndex((s) => s.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "schedule not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as Partial<RecurringSchedule>;
+    const updated: RecurringSchedule = {
+      ...testState.recurringSchedules[idx],
+      ...body,
+    };
+    testState.recurringSchedules[idx] = updated;
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/recurring/:id", ({ params }) => {
+    const id = Number(params.id);
+    const idx = testState.recurringSchedules.findIndex((s) => s.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "schedule not found" }, { status: 404 });
+    }
+    testState.recurringSchedules.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
   http.get("/api/settings", () => HttpResponse.json(testState.settings)),
 
   http.patch("/api/settings/base_currency", async ({ request }) => {
@@ -289,6 +374,29 @@ export const handlers = [
     return HttpResponse.json(preview);
   }),
 
+  http.post("/api/import/preview", async ({ request }) => {
+    const body = (await request.json()) as { file_content: string };
+    const lines = body.file_content.split("\n").filter((l) => l.trim().length > 0);
+    const rows = lines.map((_, idx) => ({
+      row_index: idx,
+      date: "2026-05-01",
+      description: `Row ${idx}`,
+      amount: "-10.00",
+      currency: "CHF",
+      kind_hint: "expense",
+      is_duplicate: false,
+      errors: [],
+    }));
+    return HttpResponse.json({ rows });
+  }),
+
+  http.post("/api/import/commit", async ({ request }) => {
+    const body = (await request.json()) as {
+      selections: Array<{ row_index: number }>;
+    };
+    return HttpResponse.json({ imported: body.selections.length, skipped: 0 });
+  }),
+
   http.get("/api/fx/status", () => HttpResponse.json(testState.fxStatus)),
 
   http.post("/api/fx/refresh", () => {
@@ -302,4 +410,22 @@ export const handlers = [
   }),
 
   ...forecastHandlers,
+
+  http.get("/api/backup/download", () => {
+    // Return enough bytes to be a believable SQLite file (magic header + 100 zeros).
+    const bytes = new Uint8Array(116);
+    const magic = new TextEncoder().encode("SQLite format 3\x00");
+    bytes.set(magic, 0);
+    return new HttpResponse(bytes, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": 'attachment; filename="financial.db"',
+      },
+    });
+  }),
+
+  http.post("/api/backup/restore", () =>
+    HttpResponse.json({ status: "restoring" }, { status: 202 }),
+  ),
 ];
