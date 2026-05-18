@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
             pass
 
 
-app = FastAPI(title="Financial Assistant API", version="1.2.2", lifespan=lifespan)
+app = FastAPI(title="Financial Assistant API", version="1.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
