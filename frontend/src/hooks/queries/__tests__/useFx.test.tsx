@@ -42,6 +42,7 @@ describe("useFx", () => {
     await act(async () => {
       await result.current.mutateAsync();
     });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ["forecast"] });
+    expect(spy).toHaveBeenCalledTimes(4);
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ["forecast"] }));
   });
 });

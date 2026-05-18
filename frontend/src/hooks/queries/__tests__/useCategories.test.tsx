@@ -32,6 +32,7 @@ describe("useCategories", () => {
     await act(async () => {
       await result.current.mutateAsync(1);
     });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ["forecast"] });
+    expect(spy).toHaveBeenCalledTimes(4);
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ["forecast"] }));
   });
 });

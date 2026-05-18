@@ -42,6 +42,7 @@ describe("useSettings", () => {
     await act(async () => {
       await result.current.mutateAsync("HUF");
     });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ["forecast"] });
+    expect(spy).toHaveBeenCalledTimes(5);
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ["forecast"] }));
   });
 });
