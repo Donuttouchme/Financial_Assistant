@@ -8,17 +8,13 @@ import { CategoryFilter } from "@/components/forecast/CategoryFilter";
 import { ForecastEmptyState } from "@/components/forecast/ColdStartHint";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { useDailyCumulative } from "@/hooks/queries/useForecast";
+import { parseCategoryId } from "@/lib/forecastUrl";
 
 interface Props { month: string }
 
 export function ForecastWidget({ month }: Props) {
   const [search] = useSearchParams();
-  const categoryId = (() => {
-    const raw = search.get("category");
-    if (!raw || raw === "all") return undefined;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : undefined;
-  })();
+  const categoryId = parseCategoryId(search.get("category"));
 
   const { data: cats } = useCategories();
   const { data, isLoading } = useDailyCumulative({ month, categoryId });

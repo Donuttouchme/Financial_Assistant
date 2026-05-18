@@ -1,6 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
+import { parseMode } from "@/lib/forecastUrl";
 import type { ForecastMode } from "@/api/types";
 
 const OPTIONS: { value: ForecastMode; label: string }[] = [
@@ -10,7 +11,7 @@ const OPTIONS: { value: ForecastMode; label: string }[] = [
 
 export function ForecastModeToggle() {
   const [search, setSearch] = useSearchParams();
-  const current = (search.get("mode") as ForecastMode) || "centered";
+  const current = parseMode(search.get("mode"));
 
   return (
     <div

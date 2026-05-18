@@ -13,23 +13,13 @@ import { useCategories } from "@/hooks/queries/useCategories";
 import {
   useDailyCumulative, useMonthlyBuckets,
 } from "@/hooks/queries/useForecast";
-import type { ForecastHorizon, ForecastMode } from "@/api/types";
-
-const VALID_HORIZONS: ForecastHorizon[] = ["1m", "3m", "6m", "1y", "2y"];
+import { parseHorizon, parseMode, parseCategoryId } from "@/lib/forecastUrl";
 
 export default function ForecastPage() {
   const [search] = useSearchParams();
-  const horizon = (() => {
-    const v = search.get("horizon") as ForecastHorizon | null;
-    return v && VALID_HORIZONS.includes(v) ? v : "6m";
-  })();
-  const mode = (search.get("mode") as ForecastMode) || "centered";
-  const categoryId = (() => {
-    const raw = search.get("category");
-    if (!raw || raw === "all") return undefined;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : undefined;
-  })();
+  const horizon = parseHorizon(search.get("horizon"));
+  const mode = parseMode(search.get("mode"));
+  const categoryId = parseCategoryId(search.get("category"));
 
   const isDailyMode = horizon === "1m";
   const currentMonth = useMemo(() => format(new Date(), "yyyy-MM"), []);
