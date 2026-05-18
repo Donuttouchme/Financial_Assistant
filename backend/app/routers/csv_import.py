@@ -1,11 +1,12 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user_id
+from app.models.category import Category
 from app.models.transaction import Transaction
 from app.schemas.csv_import import (
     CsvPreviewRequest,
@@ -20,20 +21,47 @@ from app.services.currencies import SUPPORTED_CURRENCIES
 router = APIRouter(prefix="/api/import", tags=["import"])
 
 
+def _signed_amount(stored: Decimal, kind: str) -> Decimal:
+    """Recover the SIGNED amount from a stored Transaction row.
+
+    `Transaction.amount` is non-negative for income/expense kinds; the sign is
+    carried by the category kind. We invert for expenses so the dedupe key can
+    compare against signed CSV-row amounts. Savings rows may store either sign,
+    so we trust the stored value directly.
+    """
+    val = Decimal(str(stored))
+    if kind == "expense":
+        return -abs(val)
+    if kind == "income":
+        return abs(val)
+    return val  # savings or any other future kind: pass through as-is
+
+
 def _mark_duplicates(db: Session, user_id: int, rows: list[ParsedRow]) -> None:
-    """In-place: set row.is_duplicate=True when (date, |amount|, description) matches an existing tx."""
+    """In-place: set row.is_duplicate=True when (date, signed_amount, description) matches an existing tx.
+
+    Uses signed amounts so a +45.30 income and a -45.30 expense on the same
+    date+description are NOT collapsed as duplicates.
+    """
     has_valid = any(r.date and r.amount is not None for r in rows)
     if not has_valid:
         return
     existing = db.execute(
-        select(Transaction.date, Transaction.amount, Transaction.description).where(
-            Transaction.user_id == user_id
+        select(
+            Transaction.date,
+            Transaction.amount,
+            Transaction.description,
+            Category.kind,
         )
+        .join(Category, Category.id == Transaction.category_id)
+        .where(Transaction.user_id == user_id)
     ).all()
-    existing_keys = {(d, abs(Decimal(str(a))), desc) for d, a, desc in existing}
+    existing_keys = {
+        (d, _signed_amount(amt, kind), desc) for d, amt, desc, kind in existing
+    }
     for r in rows:
         if r.date and r.amount is not None:
-            if (r.date, abs(r.amount), r.description) in existing_keys:
+            if (r.date, r.amount, r.description) in existing_keys:
                 r.is_duplicate = True
 
 
@@ -51,6 +79,7 @@ def preview(
 @router.post("/commit", response_model=ImportCommitResponse)
 async def commit(
     payload: ImportCommitRequest,
+    response: Response,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -68,13 +97,21 @@ async def commit(
         or base_currency
     ).upper()
 
-    # Eager-fill FX rates for all unique transaction dates upfront
+    # Eager-fill FX rates for all unique transaction dates upfront. Any dates
+    # the fetch couldn't fill (offline / frankfurter down / weekend gap) are
+    # surfaced to the client via a response header so the UI can show a toast
+    # — rows still get inserted with base_amount=None and self-heal on the
+    # next FX refresh.
     unique_dates = {
         r.date
         for sel in payload.selections
         if (r := by_index.get(sel.row_index)) is not None and r.date is not None
     }
-    await fx_service.ensure_rates_for_dates(db, unique_dates)
+    missing_fx_dates = await fx_service.ensure_rates_for_dates(db, unique_dates)
+    if missing_fx_dates:
+        response.headers["X-Fx-Missing-Dates"] = ",".join(
+            d.isoformat() for d in missing_fx_dates
+        )
 
     for sel in payload.selections:
         r = by_index.get(sel.row_index)
