@@ -13,8 +13,17 @@ adding a new model means adding its ``__tablename__`` here too.
 
 from __future__ import annotations
 
+import shutil
 import sqlite3
+from datetime import datetime
 from pathlib import Path
+
+from app.config import settings
+
+# How many ``<live>.pre-restore-*`` snapshots to keep on disk. Older
+# archives are pruned after each successful commit so a long-running install
+# doesn't accumulate gigabytes of stale backups.
+_PRE_RESTORE_KEEP = 5
 
 # Every user-data table the application requires at runtime. Mirrors the
 # ``__tablename__`` values declared in ``app.models.*``. Keep alphabetised.
@@ -77,3 +86,81 @@ def validate_uploaded_db(path: Path) -> None:
         raise ValueError(
             f"backup is missing required table: {first}"
         )
+
+
+# --- restore lifecycle --------------------------------------------------
+#
+# ``export_db`` / ``stage_restore`` / ``commit_restore`` form the three-step
+# upload flow used by the backup router (Task E3). The service is strictly
+# file-IO: it does NOT dispose the SQLAlchemy engine. On Windows the open
+# engine holds a lock on the live DB file and ``shutil.move`` will raise a
+# ``PermissionError`` — the router is responsible for calling
+# ``engine.dispose()`` before invoking ``commit_restore``.
+
+
+def _live_db_path() -> Path:
+    """Return the on-disk live SQLite path from settings."""
+    return Path(settings.resolved_db_path())
+
+
+def export_db() -> bytes:
+    """Return the raw bytes of the live database file.
+
+    Reads the file directly; no SQLite handles are opened. The router can
+    stream the result back to the client as a ``.db`` download.
+    """
+    return _live_db_path().read_bytes()
+
+
+def stage_restore(uploaded: bytes) -> Path:
+    """Write ``uploaded`` to ``<live>.pending`` and validate it.
+
+    On success the pending path is returned (still on disk, untouched).
+    On validation failure the pending file is removed and the underlying
+    ``ValueError`` propagates so the router can return HTTP 400.
+    """
+    live = _live_db_path()
+    pending = live.parent / f"{live.name}.pending"
+    pending.write_bytes(uploaded)
+    try:
+        validate_uploaded_db(pending)
+    except Exception:
+        pending.unlink(missing_ok=True)
+        raise
+    return pending
+
+
+def commit_restore() -> Path:
+    """Atomically swap ``<live>.pending`` into the live path.
+
+    Returns the path of the timestamped ``<live>.pre-restore-*`` archive
+    that holds the previous live DB. Raises ``FileNotFoundError`` if no
+    ``.pending`` is staged.
+
+    The caller MUST have disposed the SQLAlchemy engine first — see module
+    docstring.
+    """
+    live = _live_db_path()
+    pending = live.parent / f"{live.name}.pending"
+    if not pending.exists():
+        raise FileNotFoundError(f"no pending restore at {pending}")
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    archive = live.parent / f"{live.name}.pre-restore-{stamp}"
+    if live.exists():
+        shutil.move(str(live), str(archive))
+    shutil.move(str(pending), str(live))
+    _prune_archives(live)
+    return archive
+
+
+def _prune_archives(live: Path) -> None:
+    """Keep only the ``_PRE_RESTORE_KEEP`` most-recent pre-restore archives.
+
+    Archive filenames embed a ``YYYYMMDD-HHMMSS`` timestamp, so lexicographic
+    sort is equivalent to chronological order — the trailing slice is the
+    newest set we want to retain.
+    """
+    archives = sorted(live.parent.glob(f"{live.name}.pre-restore-*"))
+    for old in archives[:-_PRE_RESTORE_KEEP]:
+        old.unlink()
