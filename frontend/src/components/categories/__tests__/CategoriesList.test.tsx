@@ -22,5 +22,6 @@ describe("CategoriesList", () => {
     renderWith();
     expect(await screen.findByText("Income")).toBeInTheDocument();
     expect(screen.getByText("Expense")).toBeInTheDocument();
+    expect(screen.getByText("Savings")).toBeInTheDocument();
   });
 });
