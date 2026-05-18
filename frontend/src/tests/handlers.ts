@@ -174,6 +174,26 @@ export const handlers = [
     return HttpResponse.json(tx, { status: 201 });
   }),
 
+  http.put("/api/transactions/:id", async ({ params, request }) => {
+    const id = Number(params.id);
+    const idx = testState.transactions.findIndex((t) => t.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as Partial<{
+      amount: string; date: string; category_id: number;
+      description: string; is_recurring: boolean; currency: string;
+    }>;
+    const updated: Transaction = {
+      ...testState.transactions[idx],
+      ...body,
+      base_amount: body.amount ?? testState.transactions[idx].base_amount,
+      updated_at: new Date().toISOString(),
+    };
+    testState.transactions[idx] = updated;
+    return HttpResponse.json(updated);
+  }),
+
   http.delete("/api/transactions/:id", ({ params }) => {
     const id = Number(params.id);
     const idx = testState.transactions.findIndex((t) => t.id === id);
@@ -182,6 +202,27 @@ export const handlers = [
     }
     testState.transactions.splice(idx, 1);
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.put("/api/budgets/:categoryId", async ({ params, request }) => {
+    const categoryId = Number(params.categoryId);
+    const body = (await request.json()) as {
+      month: string; monthly_limit: string;
+    };
+    const existing = testState.budgets.find(
+      (b) => b.category_id === categoryId && b.month === body.month,
+    );
+    if (existing) {
+      existing.monthly_limit = body.monthly_limit;
+      return HttpResponse.json(existing);
+    }
+    const created: BudgetRead = {
+      category_id: categoryId,
+      month: body.month,
+      monthly_limit: body.monthly_limit,
+    };
+    testState.budgets.push(created);
+    return HttpResponse.json(created, { status: 201 });
   }),
 
   http.get("/api/budgets", ({ request }) => {
