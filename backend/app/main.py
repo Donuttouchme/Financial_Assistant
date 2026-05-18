@@ -13,7 +13,7 @@ import app.models  # noqa: F401 — register models with Base.metadata
 from app import idle
 from app.database import Base, SessionLocal, engine
 from app.migrations import run_migrations
-from app.routers import budgets, categories, csv_import, export, health, heartbeat, import_presets, recurring, transactions
+from app.routers import backup, budgets, categories, csv_import, export, health, heartbeat, import_presets, recurring, transactions
 from app.routers import settings as settings_router, fx as fx_router
 from app.routers import forecast as forecast_router
 from app.services import recurring_service, fx_service, settings_service
@@ -96,6 +96,7 @@ app.include_router(settings_router.router)
 app.include_router(fx_router.router)
 app.include_router(forecast_router.router)
 app.include_router(recurring.router)
+app.include_router(backup.router)
 
 
 # SPA fallback + cache headers.
