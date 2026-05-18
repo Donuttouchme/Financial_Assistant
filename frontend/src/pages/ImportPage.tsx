@@ -65,6 +65,13 @@ export default function ImportPage() {
       qc.invalidateQueries({ queryKey: ["budgets"] });
       qc.invalidateQueries({ queryKey: ["forecast"] });
       toast.success(`Imported ${r.imported}, skipped ${r.skipped}`);
+      if (r.missing_fx_dates.length > 0) {
+        toast.warning(
+          `FX unavailable for ${r.missing_fx_dates.length} date(s). ` +
+            `Affected rows will fill in on the next rate refresh.`,
+          { duration: 10_000 },
+        );
+      }
       setRows(null);
       setFileContent(null);
     },
