@@ -289,6 +289,29 @@ export const handlers = [
     return HttpResponse.json(preview);
   }),
 
+  http.post("/api/import/preview", async ({ request }) => {
+    const body = (await request.json()) as { file_content: string };
+    const lines = body.file_content.split("\n").filter((l) => l.trim().length > 0);
+    const rows = lines.map((_, idx) => ({
+      row_index: idx,
+      date: "2026-05-01",
+      description: `Row ${idx}`,
+      amount: "-10.00",
+      currency: "CHF",
+      kind_hint: "expense",
+      is_duplicate: false,
+      errors: [],
+    }));
+    return HttpResponse.json({ rows });
+  }),
+
+  http.post("/api/import/commit", async ({ request }) => {
+    const body = (await request.json()) as {
+      selections: Array<{ row_index: number }>;
+    };
+    return HttpResponse.json({ imported: body.selections.length, skipped: 0 });
+  }),
+
   http.get("/api/fx/status", () => HttpResponse.json(testState.fxStatus)),
 
   http.post("/api/fx/refresh", () => {
