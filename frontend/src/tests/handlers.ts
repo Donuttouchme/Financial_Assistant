@@ -368,4 +368,22 @@ export const handlers = [
   }),
 
   ...forecastHandlers,
+
+  http.get("/api/backup/download", () => {
+    // Return enough bytes to be a believable SQLite file (magic header + 100 zeros).
+    const bytes = new Uint8Array(116);
+    const magic = new TextEncoder().encode("SQLite format 3\x00");
+    bytes.set(magic, 0);
+    return new HttpResponse(bytes, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": 'attachment; filename="financial.db"',
+      },
+    });
+  }),
+
+  http.post("/api/backup/restore", () =>
+    HttpResponse.json({ status: "restoring" }, { status: 202 }),
+  ),
 ];
