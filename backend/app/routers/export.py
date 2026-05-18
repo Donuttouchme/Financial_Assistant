@@ -15,11 +15,11 @@ def export_csv(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    csv_text = export_service.export_transactions_csv(db, user_id=user_id, month=month)
+    csv_bytes = export_service.export_transactions_csv(db, user_id=user_id, month=month)
     filename_part = month if month else "all"
     return Response(
-        content=csv_text,
-        media_type="text/csv",
+        content=csv_bytes,
+        media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f'attachment; filename="transactions-{filename_part}.csv"'
         },

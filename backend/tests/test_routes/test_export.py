@@ -7,10 +7,15 @@ def test_export_csv_returns_csv_content_type_and_header(client):
     response = client.get("/api/export/csv", params={"month": "2026-05"})
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
+    # Excel-friendly UTF-8 charset declared
+    assert "charset=utf-8" in response.headers["content-type"].lower()
     assert "attachment" in response.headers["content-disposition"]
     assert "2026-05" in response.headers["content-disposition"]
+    # Body is bytes-prefixed with the UTF-8 BOM so Excel opens it as UTF-8.
+    assert response.content.startswith(b"\xef\xbb\xbf")
 
-    body = response.text.splitlines()
+    # Decode with utf-8-sig to strip the BOM before line-parsing.
+    body = response.content.decode("utf-8-sig").splitlines()
     assert body[0] == "date,amount,currency,category,description,base_amount,base_currency"
     # data row: date, amount, currency, category, description, base_amount, base_currency
     parts = body[1].split(",")
@@ -31,7 +36,7 @@ def test_export_csv_without_month_returns_all(client):
 
     response = client.get("/api/export/csv")
     assert response.status_code == 200
-    lines = response.text.splitlines()
+    lines = response.content.decode("utf-8-sig").splitlines()
     assert len(lines) == 3  # header + 2 rows
 
 
@@ -62,7 +67,7 @@ def test_export_includes_currency_columns(client, db_session):
 
     resp = client.get("/api/export/csv", params={"month": "2026-05"})
     assert resp.status_code == 200
-    text = resp.text
+    text = resp.content.decode("utf-8-sig")
     header = text.splitlines()[0].split(",")
     for col in ("date", "amount", "currency", "category", "description", "base_amount", "base_currency"):
         assert col in header, f"missing {col} in {header!r}"
