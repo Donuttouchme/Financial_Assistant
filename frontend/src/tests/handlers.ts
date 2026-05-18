@@ -217,6 +217,7 @@ export const handlers = [
       return HttpResponse.json(existing);
     }
     const created: BudgetRead = {
+      id: testState.budgets.length + 1,
       category_id: categoryId,
       month: body.month,
       monthly_limit: body.monthly_limit,
