@@ -29,6 +29,41 @@ def test_create_transaction_persists_fields(db_session, groceries):
     assert tx.user_id == 1
 
 
+def test_transaction_schedule_id_is_nullable_and_persists(db_session, groceries):
+    """schedule_id FK column added in Task D1 must default to None and accept
+    a value pointing at a RecurringSchedule row.
+    """
+    from app.models.recurring_schedule import RecurringSchedule
+    from app.models.transaction import Transaction
+
+    # Bare-add: default schedule_id is None.
+    tx = transaction_service.create_transaction(
+        db_session, user_id=1, amount=Decimal("1"), tx_date=date(2026, 5, 1),
+        category_id=groceries.id, description="parent",
+    )
+    assert tx.schedule_id is None
+
+    # Seed a schedule and a second tx whose schedule_id points at it.
+    sched = RecurringSchedule(
+        user_id=1, transaction_id=tx.id, amount=Decimal("1"),
+        category_id=groceries.id, description="parent",
+        start_date=date(2026, 5, 1), next_occurrence_date=date(2026, 6, 1),
+        frequency="monthly",
+    )
+    db_session.add(sched)
+    db_session.flush()
+
+    child = Transaction(
+        user_id=1, amount=Decimal("1"), date=date(2026, 6, 1),
+        category_id=groceries.id, description="child", schedule_id=sched.id,
+    )
+    db_session.add(child)
+    db_session.flush()
+
+    db_session.refresh(child)
+    assert child.schedule_id == sched.id
+
+
 def test_create_transaction_rejects_non_positive_amount(db_session, groceries):
     with pytest.raises(ValueError, match="amount"):
         transaction_service.create_transaction(
