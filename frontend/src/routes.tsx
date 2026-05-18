@@ -8,6 +8,7 @@ import ExportPage from "@/pages/ExportPage";
 import ForecastPage from "@/pages/ForecastPage";
 import ImportPage from "@/pages/ImportPage";
 import NotFoundPage from "@/pages/NotFoundPage";
+import RecurringPage from "@/pages/RecurringPage";
 import SettingsPage from "@/pages/SettingsPage";
 
 export const router = createBrowserRouter([
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: "import", element: <ImportPage /> },
       { path: "export", element: <ExportPage /> },
       { path: "forecast", element: <ForecastPage /> },
+      { path: "recurring", element: <RecurringPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
