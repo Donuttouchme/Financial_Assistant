@@ -7,6 +7,7 @@ import type {
   FxRefreshResponse,
   FxStatusRead,
   ImportPreset,
+  RecurringSchedule,
   SettingsRead,
   Transaction,
 } from "@/api/types";
@@ -16,11 +17,13 @@ export const testState = {
   transactions: [] as Transaction[],
   budgets: [] as BudgetRead[],
   importPresets: [] as ImportPreset[],
+  recurringSchedules: [] as RecurringSchedule[],
   settings: { base_currency: "CHF" } as SettingsRead,
   fxStatus: { latest_date: null, source: "frankfurter.dev", is_fresh: false } as FxStatusRead,
   nextCatId: 1,
   nextTxId: 1,
   nextPresetId: 1,
+  nextScheduleId: 1,
 };
 
 export function resetTestState() {
@@ -28,11 +31,13 @@ export function resetTestState() {
   testState.transactions = [];
   testState.budgets = [];
   testState.importPresets = [];
+  testState.recurringSchedules = [];
   testState.settings = { base_currency: "CHF" };
   testState.fxStatus = { latest_date: null, source: "frankfurter.dev", is_fresh: false };
   testState.nextCatId = 1;
   testState.nextTxId = 1;
   testState.nextPresetId = 1;
+  testState.nextScheduleId = 1;
 }
 
 function fakeDailyMay2026() {
@@ -260,6 +265,44 @@ export const handlers = [
       return HttpResponse.json({ detail: "not found" }, { status: 404 });
     }
     testState.importPresets.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get("/api/recurring", () =>
+    HttpResponse.json(testState.recurringSchedules),
+  ),
+
+  http.get("/api/recurring/:id", ({ params }) => {
+    const id = Number(params.id);
+    const sched = testState.recurringSchedules.find((s) => s.id === id);
+    if (!sched) {
+      return HttpResponse.json({ detail: "schedule not found" }, { status: 404 });
+    }
+    return HttpResponse.json(sched);
+  }),
+
+  http.patch("/api/recurring/:id", async ({ params, request }) => {
+    const id = Number(params.id);
+    const idx = testState.recurringSchedules.findIndex((s) => s.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "schedule not found" }, { status: 404 });
+    }
+    const body = (await request.json()) as Partial<RecurringSchedule>;
+    const updated: RecurringSchedule = {
+      ...testState.recurringSchedules[idx],
+      ...body,
+    };
+    testState.recurringSchedules[idx] = updated;
+    return HttpResponse.json(updated);
+  }),
+
+  http.delete("/api/recurring/:id", ({ params }) => {
+    const id = Number(params.id);
+    const idx = testState.recurringSchedules.findIndex((s) => s.id === id);
+    if (idx < 0) {
+      return HttpResponse.json({ detail: "schedule not found" }, { status: 404 });
+    }
+    testState.recurringSchedules.splice(idx, 1);
     return new HttpResponse(null, { status: 204 });
   }),
 
