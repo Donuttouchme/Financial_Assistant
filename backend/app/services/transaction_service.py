@@ -183,19 +183,31 @@ def list_transactions(
     return list(db.execute(stmt).scalars().all())
 
 
+def _normalize(text: str) -> str:
+    """Casefold and keep only letters/digits.
+
+    str.isalnum() keeps accented Unicode letters (á/é/ő/ű) and digits while
+    dropping spaces and punctuation, so "Media-Markt"/"Media Markt"/"MediaMarkt"
+    all collapse to "mediamarkt".
+    """
+    return "".join(c for c in text.casefold() if c.isalnum())
+
+
 def search_transactions(
     db: Session,
     *,
     user_id: int,
     q: str,
 ) -> list[Transaction]:
-    """All-months search: case-insensitive substring of the query against the
-    transaction description OR its category name.
+    """All-months search. Splits the query into whitespace-separated words and
+    requires EVERY word to appear (as a normalized substring) in the
+    transaction's description or category name.
 
-    Matching is done in Python with str.casefold() rather than SQL LIKE because
-    SQLite's LIKE/lower() only fold ASCII case — accented Hungarian letters
-    (á/é/ő/ű ...) would not match across case. Data volume is single-user and
-    modest, so loading the rows and filtering in Python is cheap.
+    _normalize casefolds and strips spaces/punctuation, so multi-word queries
+    match concatenated text in either direction ("Media Markt" <-> "MediaMarkt")
+    and word order doesn't matter. Matching is done in Python (not SQL LIKE) so
+    accented Hungarian letters fold correctly. Data volume is single-user and
+    modest.
 
     Returns [] for queries shorter than 2 non-whitespace chars (defensive; the
     frontend gates at 2 chars too).
@@ -203,7 +215,9 @@ def search_transactions(
     stripped = q.strip()
     if len(stripped) < 2:
         return []
-    term = stripped.casefold()
+    tokens = [w for w in (_normalize(word) for word in stripped.split()) if w]
+    if not tokens:
+        return []
 
     cat_names = {
         c.id: c.name
@@ -221,9 +235,14 @@ def search_transactions(
 
     out: list[Transaction] = []
     for t in rows:
-        description = (t.description or "").casefold()
-        category = cat_names.get(t.category_id, "").casefold()
-        if term in description or term in category:
+        # NUL separator keeps a query word from matching across the
+        # description<->category boundary (no normalized token contains NUL).
+        haystack = (
+            _normalize(t.description or "")
+            + "\x00"
+            + _normalize(cat_names.get(t.category_id, ""))
+        )
+        if all(token in haystack for token in tokens):
             out.append(t)
     return out
 

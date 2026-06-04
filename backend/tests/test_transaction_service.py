@@ -528,3 +528,71 @@ def test_search_short_query_returns_empty(db_session):
     )
     assert svc.search_transactions(db_session, user_id=1, q="a") == []
     assert svc.search_transactions(db_session, user_id=1, q="  ") == []
+
+
+def _seed_one(db_session, *, description, name="Food"):
+    from app.models.category import Category
+    from app.services import transaction_service as svc
+
+    cat = Category(user_id=1, name=name, kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+    svc.create_transaction(
+        db_session, user_id=1, amount=Decimal("10"),
+        tx_date=date(2026, 1, 5), category_id=cat.id,
+        description=description, currency="CHF",
+    )
+
+
+def test_search_multiword_matches_concatenated_text(db_session):
+    from app.services import transaction_service as svc
+
+    _seed_one(db_session, description="MediaMarkt purchase")
+    results = svc.search_transactions(db_session, user_id=1, q="Media Markt")
+    assert len(results) == 1
+
+
+def test_search_single_word_query_matches_spaced_text(db_session):
+    from app.services import transaction_service as svc
+
+    _seed_one(db_session, description="Media Markt")
+    results = svc.search_transactions(db_session, user_id=1, q="mediamarkt")
+    assert len(results) == 1
+
+
+def test_search_words_can_be_reordered(db_session):
+    from app.services import transaction_service as svc
+
+    _seed_one(db_session, description="MediaMarkt")
+    results = svc.search_transactions(db_session, user_id=1, q="Markt Media")
+    assert len(results) == 1
+
+
+def test_search_ignores_punctuation(db_session):
+    from app.services import transaction_service as svc
+
+    _seed_one(db_session, description="Spar-Market 2026")
+    assert len(svc.search_transactions(db_session, user_id=1, q="spar market")) == 1
+    assert len(svc.search_transactions(db_session, user_id=1, q="media.markt")) == 0
+
+
+def test_search_requires_all_words(db_session):
+    from app.services import transaction_service as svc
+
+    _seed_one(db_session, description="MediaMarkt")
+    assert svc.search_transactions(db_session, user_id=1, q="Media Aldi") == []
+
+
+def test_search_word_spans_description_and_category(db_session):
+    from app.services import transaction_service as svc
+
+    _seed_one(db_session, description="weekly shop", name="Groceries")
+    results = svc.search_transactions(db_session, user_id=1, q="grocer shop")
+    assert len(results) == 1
+
+
+def test_search_word_cannot_span_field_boundary(db_session):
+    from app.services import transaction_service as svc
+
+    _seed_one(db_session, description="buy media", name="rket club")
+    assert svc.search_transactions(db_session, user_id=1, q="mediarket") == []
