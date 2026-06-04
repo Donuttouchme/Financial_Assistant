@@ -185,3 +185,27 @@ def test_delete_transaction_returns_204(client):
     assert response.status_code == 204
 
     assert client.get("/api/transactions").json() == []
+
+
+def test_search_endpoint_returns_enriched_matches(client):
+    cat = client.post("/api/categories", json={"name": "Food"}).json()["id"]
+    client.post("/api/transactions", json={
+        "amount": "10", "date": "2026-01-05", "category_id": cat,
+        "description": "Lunch", "currency": "CHF",
+    })
+    client.post("/api/transactions", json={
+        "amount": "20", "date": "2026-05-05", "category_id": cat,
+        "description": "Dinner", "currency": "CHF",
+    })
+
+    resp = client.get("/api/transactions/search", params={"q": "lun"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [t["description"] for t in body] == ["Lunch"]
+    assert "base_amount" in body[0]
+
+
+def test_search_endpoint_short_query_returns_empty(client):
+    resp = client.get("/api/transactions/search", params={"q": "a"})
+    assert resp.status_code == 200
+    assert resp.json() == []

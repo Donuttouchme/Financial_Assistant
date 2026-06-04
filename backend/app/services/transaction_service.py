@@ -183,6 +183,51 @@ def list_transactions(
     return list(db.execute(stmt).scalars().all())
 
 
+def search_transactions(
+    db: Session,
+    *,
+    user_id: int,
+    q: str,
+) -> list[Transaction]:
+    """All-months search: case-insensitive substring of the query against the
+    transaction description OR its category name.
+
+    Matching is done in Python with str.casefold() rather than SQL LIKE because
+    SQLite's LIKE/lower() only fold ASCII case — accented Hungarian letters
+    (á/é/ő/ű ...) would not match across case. Data volume is single-user and
+    modest, so loading the rows and filtering in Python is cheap.
+
+    Returns [] for queries shorter than 2 non-whitespace chars (defensive; the
+    frontend gates at 2 chars too).
+    """
+    stripped = q.strip()
+    if len(stripped) < 2:
+        return []
+    term = stripped.casefold()
+
+    cat_names = {
+        c.id: c.name
+        for c in db.execute(
+            select(Category).where(Category.user_id == user_id)
+        ).scalars().all()
+    }
+
+    stmt = (
+        select(Transaction)
+        .where(Transaction.user_id == user_id)
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+    )
+    rows = db.execute(stmt).scalars().all()
+
+    out: list[Transaction] = []
+    for t in rows:
+        description = (t.description or "").casefold()
+        category = cat_names.get(t.category_id, "").casefold()
+        if term in description or term in category:
+            out.append(t)
+    return out
+
+
 def get_transaction(db: Session, *, user_id: int, transaction_id: int) -> Transaction | None:
     return db.execute(
         select(Transaction).where(

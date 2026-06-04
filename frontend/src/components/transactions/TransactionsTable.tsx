@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { TransactionFormDialog } from "@/components/transactions/TransactionFormDialog";
 import {
-  useTransactions, useDeleteTransaction,
+  useTransactions, useSearchTransactions, useDeleteTransaction,
 } from "@/hooks/queries/useTransactions";
 import { useCategories } from "@/hooks/queries/useCategories";
 import { useBaseCurrency } from "@/hooks/queries/useSettings";
@@ -23,13 +23,19 @@ import type { Transaction } from "@/api/types";
 interface Props {
   month: string;
   categoryId?: number;
+  search?: string | null;
 }
 
-export function TransactionsTable({ month, categoryId }: Props) {
-  const { data: txs, isLoading } = useTransactions({
-    month,
-    category_id: categoryId,
+export function TransactionsTable({ month, categoryId, search }: Props) {
+  const isSearching = !!search;
+  const listQuery = useTransactions(
+    { month, category_id: categoryId },
+    { enabled: !isSearching },
+  );
+  const searchQuery = useSearchTransactions(search ?? "", {
+    enabled: isSearching,
   });
+  const { data: txs, isLoading } = isSearching ? searchQuery : listQuery;
   const { data: cats } = useCategories();
   const baseCurrency = useBaseCurrency();
   const del = useDeleteTransaction();
@@ -51,7 +57,9 @@ export function TransactionsTable({ month, categoryId }: Props) {
   if ((txs ?? []).length === 0) {
     return (
       <p className="text-sm text-muted-foreground italic py-8 text-center">
-        No transactions for this month.
+        {isSearching
+          ? `No transactions match "${search}".`
+          : "No transactions for this month."}
       </p>
     );
   }

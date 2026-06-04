@@ -18,6 +18,11 @@ export function listTransactions(params: {
   return apiFetch<Transaction[]>(`/api/transactions${qs ? `?${qs}` : ""}`);
 }
 
+export function searchTransactions(q: string): Promise<Transaction[]> {
+  const search = new URLSearchParams({ q });
+  return apiFetch<Transaction[]>(`/api/transactions/search?${search.toString()}`);
+}
+
 export function createTransaction(
   payload: TransactionCreatePayload,
 ): Promise<Transaction> {

@@ -46,6 +46,16 @@ def list_transactions(
     return transaction_service.enrich_with_base_amount(db, txs)
 
 
+@router.get("/search", response_model=list[TransactionRead])
+def search_transactions(
+    q: str = Query(default=""),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    txs = transaction_service.search_transactions(db, user_id=user_id, q=q)
+    return transaction_service.enrich_with_base_amount(db, txs)
+
+
 @router.put("/{transaction_id}", response_model=TransactionRead)
 async def update_transaction(
     transaction_id: int,

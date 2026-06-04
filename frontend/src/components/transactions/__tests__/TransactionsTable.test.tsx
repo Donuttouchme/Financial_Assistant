@@ -77,3 +77,35 @@ describe("TransactionsTable — multi-currency display", () => {
     });
   });
 });
+
+describe("TransactionsTable search mode", () => {
+  beforeEach(() => {
+    testState.transactions.push(
+      {
+        id: 10, user_id: 1, amount: "10", date: "2026-01-05", category_id: 1,
+        description: "lunch out", is_recurring: false, currency: "CHF",
+        base_amount: "10", created_at: "", updated_at: "",
+      },
+      {
+        id: 11, user_id: 1, amount: "20", date: "2026-05-05", category_id: 1,
+        description: "dinner", is_recurring: false, currency: "CHF",
+        base_amount: "20", created_at: "", updated_at: "",
+      },
+    );
+  });
+
+  it("renders all-months search matches when search prop is set", async () => {
+    render(wrap(<TransactionsTable month="2026-05" search="lun" />));
+    await waitFor(() =>
+      expect(screen.getByText("lunch out")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("dinner")).not.toBeInTheDocument();
+  });
+
+  it("shows a search-specific empty message when nothing matches", async () => {
+    render(wrap(<TransactionsTable month="2026-05" search="zzz" />));
+    await waitFor(() =>
+      expect(screen.getByText(/No transactions match/i)).toBeInTheDocument(),
+    );
+  });
+});

@@ -6,6 +6,7 @@ import { TransactionsTable } from "@/components/transactions/TransactionsTable";
 import { EmptyAppState } from "@/components/EmptyAppState";
 import { useUrlMonth } from "@/hooks/useUrlMonth";
 import { useCategories } from "@/hooks/queries/useCategories";
+import { useActiveSearch } from "@/hooks/useActiveSearch";
 import { useSearchParams } from "react-router-dom";
 import { monthLabel } from "@/lib/date";
 
@@ -15,6 +16,7 @@ export default function TransactionsPage() {
   const [params, setParams] = useSearchParams();
   const catParam = params.get("category_id");
   const categoryId = catParam ? Number(catParam) : undefined;
+  const search = useActiveSearch();
 
   function onCategoryChange(next: string) {
     const np = new URLSearchParams(params);
@@ -36,8 +38,11 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">
-          Transactions — {monthLabel(month)}
+          {search
+            ? `Search results for "${search}"`
+            : `Transactions — ${monthLabel(month)}`}
         </h2>
+        {!search && (
         <div className="flex items-end gap-2">
           <div>
             <Label htmlFor="tx-cat-filter" className="text-xs text-muted-foreground">
@@ -61,8 +66,9 @@ export default function TransactionsPage() {
             </Select>
           </div>
         </div>
+        )}
       </div>
-      <TransactionsTable month={month} categoryId={categoryId} />
+      <TransactionsTable month={month} categoryId={categoryId} search={search} />
     </div>
   );
 }
