@@ -5,7 +5,7 @@
 #define MyAppPublisher "Donuttouchme"
 #define MyAppURL "https://github.com/Donuttouchme/Financial_Assistant"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.3.1"
+  #define MyAppVersion "1.3.2"
 #endif
 
 [Setup]
