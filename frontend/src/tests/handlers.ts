@@ -152,6 +152,21 @@ export const handlers = [
     return HttpResponse.json(rows);
   }),
 
+  http.get("/api/transactions/search", ({ request }) => {
+    const url = new URL(request.url);
+    const q = (url.searchParams.get("q") ?? "").trim();
+    if (q.length < 2) return HttpResponse.json([]);
+    const term = q.toLowerCase();
+    const rows = testState.transactions.filter((t) => {
+      const desc = (t.description ?? "").toLowerCase();
+      const cat = (
+        testState.categories.find((c) => c.id === t.category_id)?.name ?? ""
+      ).toLowerCase();
+      return desc.includes(term) || cat.includes(term);
+    });
+    return HttpResponse.json(rows);
+  }),
+
   http.post("/api/transactions", async ({ request }) => {
     const body = (await request.json()) as {
       amount: string; date: string; category_id: number;
