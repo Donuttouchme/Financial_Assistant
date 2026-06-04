@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   createTransaction, deleteTransaction, listTransactions,
-  updateTransaction,
+  searchTransactions, updateTransaction,
 } from "@/api/transactions";
 import type {
   Transaction, TransactionCreatePayload, TransactionUpdatePayload,
@@ -11,10 +11,25 @@ import { HttpError } from "@/api/client";
 
 const TX_KEY_ROOT = "transactions";
 
-export function useTransactions(params: { month?: string; category_id?: number }) {
+export function useTransactions(
+  params: { month?: string; category_id?: number },
+  options?: { enabled?: boolean },
+) {
   return useQuery<Transaction[]>({
     queryKey: [TX_KEY_ROOT, params.month ?? null, params.category_id ?? null],
     queryFn: () => listTransactions(params),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useSearchTransactions(
+  q: string,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<Transaction[]>({
+    queryKey: [TX_KEY_ROOT, "search", q],
+    queryFn: () => searchTransactions(q),
+    enabled: options?.enabled ?? true,
   });
 }
 
