@@ -442,3 +442,89 @@ async def test_update_transaction_currency_only_does_not_eager_fill(db_session, 
         currency="USD",
     )
     assert called == []  # no fetch because tx_date was not changed
+
+
+def test_search_matches_description_case_insensitive(db_session):
+    from app.models.category import Category
+    from app.services import transaction_service as svc
+
+    cat = Category(user_id=1, name="Food", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+    svc.create_transaction(
+        db_session, user_id=1, amount=Decimal("10"),
+        tx_date=date(2026, 1, 5), category_id=cat.id,
+        description="Lunch at Joe", currency="CHF",
+    )
+    results = svc.search_transactions(db_session, user_id=1, q="LUNCH")
+    assert [t.description for t in results] == ["Lunch at Joe"]
+
+
+def test_search_matches_accented_text_with_casefold(db_session):
+    # SQLite LIKE/lower() would FAIL this (ASCII-only folding); casefold passes.
+    from app.models.category import Category
+    from app.services import transaction_service as svc
+
+    cat = Category(user_id=1, name="Food", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+    svc.create_transaction(
+        db_session, user_id=1, amount=Decimal("10"),
+        tx_date=date(2026, 1, 5), category_id=cat.id,
+        description="Étterem belváros", currency="CHF",
+    )
+    results = svc.search_transactions(db_session, user_id=1, q="ÉTTEREM")
+    assert len(results) == 1
+
+
+def test_search_matches_category_name(db_session):
+    from app.models.category import Category
+    from app.services import transaction_service as svc
+
+    cat = Category(user_id=1, name="Groceries", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+    svc.create_transaction(
+        db_session, user_id=1, amount=Decimal("10"),
+        tx_date=date(2026, 1, 5), category_id=cat.id,
+        description="weekly shop", currency="CHF",
+    )
+    results = svc.search_transactions(db_session, user_id=1, q="grocer")
+    assert len(results) == 1
+
+
+def test_search_ignores_month_and_orders_date_desc(db_session):
+    from app.models.category import Category
+    from app.services import transaction_service as svc
+
+    cat = Category(user_id=1, name="Shopping", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+    svc.create_transaction(
+        db_session, user_id=1, amount=Decimal("10"),
+        tx_date=date(2026, 1, 5), category_id=cat.id,
+        description="amazon jan", currency="CHF",
+    )
+    svc.create_transaction(
+        db_session, user_id=1, amount=Decimal("20"),
+        tx_date=date(2026, 5, 5), category_id=cat.id,
+        description="amazon may", currency="CHF",
+    )
+    results = svc.search_transactions(db_session, user_id=1, q="amazon")
+    assert [t.description for t in results] == ["amazon may", "amazon jan"]
+
+
+def test_search_short_query_returns_empty(db_session):
+    from app.models.category import Category
+    from app.services import transaction_service as svc
+
+    cat = Category(user_id=1, name="Food", kind="expense")
+    db_session.add(cat)
+    db_session.commit()
+    svc.create_transaction(
+        db_session, user_id=1, amount=Decimal("10"),
+        tx_date=date(2026, 1, 5), category_id=cat.id,
+        description="ab cd", currency="CHF",
+    )
+    assert svc.search_transactions(db_session, user_id=1, q="a") == []
+    assert svc.search_transactions(db_session, user_id=1, q="  ") == []
