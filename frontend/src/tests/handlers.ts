@@ -154,15 +154,18 @@ export const handlers = [
 
   http.get("/api/transactions/search", ({ request }) => {
     const url = new URL(request.url);
-    const q = (url.searchParams.get("q") ?? "").trim();
-    if (q.length < 2) return HttpResponse.json([]);
-    const term = q.toLowerCase();
+    const raw = (url.searchParams.get("q") ?? "").trim();
+    if (raw.length < 2) return HttpResponse.json([]);
+    const normalize = (s: string) =>
+      s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+    const tokens = raw.split(/\s+/).map(normalize).filter(Boolean);
+    if (tokens.length === 0) return HttpResponse.json([]);
     const rows = testState.transactions.filter((t) => {
-      const desc = (t.description ?? "").toLowerCase();
-      const cat = (
-        testState.categories.find((c) => c.id === t.category_id)?.name ?? ""
-      ).toLowerCase();
-      return desc.includes(term) || cat.includes(term);
+      const cat =
+        testState.categories.find((c) => c.id === t.category_id)?.name ?? "";
+      const haystack =
+        normalize(t.description ?? "") + " " + normalize(cat);
+      return tokens.every((tok) => haystack.includes(tok));
     });
     return HttpResponse.json(rows);
   }),

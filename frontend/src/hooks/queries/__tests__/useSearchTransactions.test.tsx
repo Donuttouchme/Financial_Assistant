@@ -40,4 +40,17 @@ describe("useSearchTransactions", () => {
     );
     expect(result.current.fetchStatus).toBe("idle");
   });
+
+  it("matches a spaced query against concatenated text", async () => {
+    testState.transactions.push({
+      id: 2, user_id: 1, amount: "30", date: "2026-02-02", category_id: 1,
+      description: "MediaMarkt TV", is_recurring: false, currency: "CHF",
+      base_amount: "30", created_at: "", updated_at: "",
+    });
+    const { result } = renderHook(() => useSearchTransactions("Media Markt"), {
+      wrapper: wrap(),
+    });
+    await waitFor(() => expect(result.current.data?.length).toBe(1));
+    expect(result.current.data?.[0].description).toBe("MediaMarkt TV");
+  });
 });
