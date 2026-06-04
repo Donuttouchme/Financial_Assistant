@@ -200,9 +200,10 @@ def search_transactions(
     Returns [] for queries shorter than 2 non-whitespace chars (defensive; the
     frontend gates at 2 chars too).
     """
-    term = q.strip().casefold()
-    if len(term) < 2:
+    stripped = q.strip()
+    if len(stripped) < 2:
         return []
+    term = stripped.casefold()
 
     cat_names = {
         c.id: c.name

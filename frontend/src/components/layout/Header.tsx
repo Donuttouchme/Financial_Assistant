@@ -37,13 +37,17 @@ export function Header({ onAddTransaction }: HeaderProps) {
   // otherwise drop an existing ?q=. No-op on non-transactions pages with no q.
   useEffect(() => {
     const term = debounced.trim();
+    const next = new URLSearchParams(params);
     if (term.length >= 2) {
-      const target = `/transactions?q=${encodeURIComponent(term)}`;
+      next.set("q", term);
+      const target = `/transactions?${next.toString()}`;
       if (location.pathname + location.search !== target) {
         navigate(target);
       }
     } else if (params.get("q")) {
-      navigate("/transactions");
+      next.delete("q");
+      const qs = next.toString();
+      navigate(`/transactions${qs ? `?${qs}` : ""}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced]);
