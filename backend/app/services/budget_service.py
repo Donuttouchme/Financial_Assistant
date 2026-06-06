@@ -143,11 +143,28 @@ def list_budgets_with_spending(
         .subquery()
     )
 
+    # Effective-row picker: per category, take the row with the largest
+    # month at-or-before the queried month. Correlated subquery is fine on
+    # SQLite and reads cleanly without DB-specific window-function syntax.
+    effective_month_subq = (
+        select(func.max(BudgetLimit.month))
+        .where(
+            BudgetLimit.user_id == user_id,
+            BudgetLimit.category_id == Category.id,
+            BudgetLimit.month <= month,
+        )
+        .correlate(Category)
+        .scalar_subquery()
+    )
+
     rows = db.execute(
         select(BudgetLimit, Category.name, spent_subq.c.spent)
         .join(Category, Category.id == BudgetLimit.category_id)
         .outerjoin(spent_subq, spent_subq.c.category_id == BudgetLimit.category_id)
-        .where(BudgetLimit.user_id == user_id, BudgetLimit.month == month)
+        .where(
+            BudgetLimit.user_id == user_id,
+            BudgetLimit.month == effective_month_subq,
+        )
     ).all()
 
     two = Decimal("0.01")
@@ -160,7 +177,7 @@ def list_budgets_with_spending(
             BudgetWithSpendingRow(
                 category_id=budget.category_id,
                 category_name=cat_name,
-                month=budget.month,
+                month=budget.month,  # the EFFECTIVE month, not the queried one
                 monthly_limit=limit,
                 spent=spent_dec,
                 over_budget=spent_dec > limit,
