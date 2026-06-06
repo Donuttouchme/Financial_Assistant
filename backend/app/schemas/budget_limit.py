@@ -5,7 +5,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class BudgetSet(BaseModel):
-    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    """PUT /api/budgets/{category_id} request body.
+
+    The server stamps the effective-from month from the request clock; the
+    client cannot set it. Keeps the recurring-budget mental model clean.
+    """
     monthly_limit: Decimal = Field(ge=Decimal("0"))
 
 
