@@ -24,7 +24,7 @@ def test_put_budget_overwrites_existing_in_same_month(client, freeze_month):
     assert response.json()["monthly_limit"] == "250.00"
 
 
-def test_put_budget_rejects_month_in_payload(client, freeze_month):
+def test_put_budget_silently_drops_month_in_payload(client, freeze_month):
     freeze_month("2026-05")
     cat_id = client.post("/api/categories", json={"name": "Groceries"}).json()["id"]
     response = client.put(
