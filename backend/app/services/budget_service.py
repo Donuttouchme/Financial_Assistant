@@ -36,10 +36,16 @@ def set_budget(
     *,
     user_id: int,
     category_id: int,
-    month: str,
+    effective_month: str,
     monthly_limit: Decimal,
 ) -> BudgetLimit:
-    _validate_month(month)
+    """Set the recurring limit for ``category_id``, effective from ``effective_month``.
+
+    If a row already exists at exactly this effective_month, its limit is
+    overwritten. Older rows are preserved (history); newer rows still
+    supersede this one for their months.
+    """
+    _validate_month(effective_month)
     _ensure_expense_category(db, user_id=user_id, category_id=category_id)
     monthly_limit = monthly_limit.quantize(Decimal("0.01"))
 
@@ -47,7 +53,7 @@ def set_budget(
         select(BudgetLimit).where(
             BudgetLimit.user_id == user_id,
             BudgetLimit.category_id == category_id,
-            BudgetLimit.month == month,
+            BudgetLimit.month == effective_month,
         )
     ).scalar_one_or_none()
     if existing is not None:
@@ -57,7 +63,10 @@ def set_budget(
         return existing
 
     budget = BudgetLimit(
-        user_id=user_id, category_id=category_id, month=month, monthly_limit=monthly_limit
+        user_id=user_id,
+        category_id=category_id,
+        month=effective_month,
+        monthly_limit=monthly_limit,
     )
     db.add(budget)
     db.commit()
