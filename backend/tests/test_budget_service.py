@@ -14,7 +14,7 @@ def groceries(db_session):
 def test_set_budget_creates_record(db_session, groceries):
     b = budget_service.set_budget(
         db_session, user_id=1, category_id=groceries.id,
-        month="2026-05", monthly_limit=Decimal("200"),
+        effective_month="2026-05", monthly_limit=Decimal("200"),
     )
     assert b.id is not None
     assert b.monthly_limit == Decimal("200")
@@ -24,11 +24,11 @@ def test_set_budget_creates_record(db_session, groceries):
 def test_set_budget_updates_existing(db_session, groceries):
     budget_service.set_budget(
         db_session, user_id=1, category_id=groceries.id,
-        month="2026-05", monthly_limit=Decimal("200"),
+        effective_month="2026-05", monthly_limit=Decimal("200"),
     )
     updated = budget_service.set_budget(
         db_session, user_id=1, category_id=groceries.id,
-        month="2026-05", monthly_limit=Decimal("250"),
+        effective_month="2026-05", monthly_limit=Decimal("250"),
     )
     assert updated.monthly_limit == Decimal("250")
 
@@ -42,7 +42,7 @@ def test_set_budget_rejects_unknown_category(db_session):
     with pytest.raises(LookupError):
         budget_service.set_budget(
             db_session, user_id=1, category_id=999,
-            month="2026-05", monthly_limit=Decimal("10"),
+            effective_month="2026-05", monthly_limit=Decimal("10"),
         )
 
 
@@ -50,14 +50,14 @@ def test_set_budget_rejects_bad_month_format(db_session, groceries):
     with pytest.raises(ValueError, match="month"):
         budget_service.set_budget(
             db_session, user_id=1, category_id=groceries.id,
-            month="2026/05", monthly_limit=Decimal("10"),
+            effective_month="2026/05", monthly_limit=Decimal("10"),
         )
 
 
 def test_list_budgets_includes_spent_and_overage(db_session, groceries):
     budget_service.set_budget(
         db_session, user_id=1, category_id=groceries.id,
-        month="2026-05", monthly_limit=Decimal("100"),
+        effective_month="2026-05", monthly_limit=Decimal("100"),
     )
     transaction_service.create_transaction(
         db_session, user_id=1, amount=Decimal("60"), tx_date=date(2026, 5, 3),
@@ -80,7 +80,7 @@ def test_list_budgets_includes_spent_and_overage(db_session, groceries):
 def test_list_budgets_excludes_transactions_outside_month(db_session, groceries):
     budget_service.set_budget(
         db_session, user_id=1, category_id=groceries.id,
-        month="2026-05", monthly_limit=Decimal("100"),
+        effective_month="2026-05", monthly_limit=Decimal("100"),
     )
     transaction_service.create_transaction(
         db_session, user_id=1, amount=Decimal("999"), tx_date=date(2026, 4, 30),
@@ -99,5 +99,5 @@ def test_set_budget_rejects_income_category(db_session):
     with pytest.raises(ValueError, match="expense"):
         budget_service.set_budget(
             db_session, user_id=1, category_id=salary.id,
-            month="2026-05", monthly_limit=Decimal("1000"),
+            effective_month="2026-05", monthly_limit=Decimal("1000"),
         )

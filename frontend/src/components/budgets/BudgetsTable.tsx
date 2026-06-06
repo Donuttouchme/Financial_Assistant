@@ -71,7 +71,7 @@ export function BudgetsTable({ month }: Props) {
       setBudget.mutate(
         {
           categoryId,
-          payload: { month, monthly_limit: cleaned },
+          payload: { monthly_limit: cleaned },
         },
         { onSettled: () => setEditing(null) },
       );

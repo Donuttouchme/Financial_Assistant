@@ -63,7 +63,7 @@ def db_session():
 
 from fastapi.testclient import TestClient
 
-from app.dependencies import get_current_user_id
+from app.dependencies import get_current_month, get_current_user_id
 from app.database import get_db
 from app.main import app
 
@@ -83,3 +83,19 @@ def client(db_session):
             yield c
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def freeze_month(client):
+    """Pin ``get_current_month`` to a value of the test's choosing.
+
+    Usage:
+        def test_x(client, freeze_month):
+            freeze_month("2026-06")
+            client.put("/api/budgets/1", json={"monthly_limit": "200"})
+    """
+    def _set(month: str) -> None:
+        app.dependency_overrides[get_current_month] = lambda: month
+
+    yield _set
+    app.dependency_overrides.pop(get_current_month, None)

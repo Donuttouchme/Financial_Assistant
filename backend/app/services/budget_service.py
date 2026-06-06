@@ -36,10 +36,16 @@ def set_budget(
     *,
     user_id: int,
     category_id: int,
-    month: str,
+    effective_month: str,
     monthly_limit: Decimal,
 ) -> BudgetLimit:
-    _validate_month(month)
+    """Set the recurring limit for ``category_id``, effective from ``effective_month``.
+
+    If a row already exists at exactly this effective_month, its limit is
+    overwritten. Older rows are preserved (history); newer rows still
+    supersede this one for their months.
+    """
+    _validate_month(effective_month)
     _ensure_expense_category(db, user_id=user_id, category_id=category_id)
     monthly_limit = monthly_limit.quantize(Decimal("0.01"))
 
@@ -47,7 +53,7 @@ def set_budget(
         select(BudgetLimit).where(
             BudgetLimit.user_id == user_id,
             BudgetLimit.category_id == category_id,
-            BudgetLimit.month == month,
+            BudgetLimit.month == effective_month,
         )
     ).scalar_one_or_none()
     if existing is not None:
@@ -57,7 +63,10 @@ def set_budget(
         return existing
 
     budget = BudgetLimit(
-        user_id=user_id, category_id=category_id, month=month, monthly_limit=monthly_limit
+        user_id=user_id,
+        category_id=category_id,
+        month=effective_month,
+        monthly_limit=monthly_limit,
     )
     db.add(budget)
     db.commit()
@@ -134,11 +143,28 @@ def list_budgets_with_spending(
         .subquery()
     )
 
+    # Effective-row picker: per category, take the row with the largest
+    # month at-or-before the queried month. Correlated subquery is fine on
+    # SQLite and reads cleanly without DB-specific window-function syntax.
+    effective_month_subq = (
+        select(func.max(BudgetLimit.month))
+        .where(
+            BudgetLimit.user_id == user_id,
+            BudgetLimit.category_id == Category.id,
+            BudgetLimit.month <= month,
+        )
+        .correlate(Category)
+        .scalar_subquery()
+    )
+
     rows = db.execute(
         select(BudgetLimit, Category.name, spent_subq.c.spent)
         .join(Category, Category.id == BudgetLimit.category_id)
         .outerjoin(spent_subq, spent_subq.c.category_id == BudgetLimit.category_id)
-        .where(BudgetLimit.user_id == user_id, BudgetLimit.month == month)
+        .where(
+            BudgetLimit.user_id == user_id,
+            BudgetLimit.month == effective_month_subq,
+        )
     ).all()
 
     two = Decimal("0.01")
@@ -151,7 +177,7 @@ def list_budgets_with_spending(
             BudgetWithSpendingRow(
                 category_id=budget.category_id,
                 category_name=cat_name,
-                month=budget.month,
+                month=budget.month,  # the EFFECTIVE month, not the queried one
                 monthly_limit=limit,
                 spent=spent_dec,
                 over_budget=spent_dec > limit,

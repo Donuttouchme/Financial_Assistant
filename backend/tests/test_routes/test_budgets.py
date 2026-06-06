@@ -1,8 +1,9 @@
-def test_put_budget_returns_200_with_new_limit(client):
+def test_put_budget_returns_200_with_new_limit(client, freeze_month):
+    freeze_month("2026-05")
     cat_id = client.post("/api/categories", json={"name": "Groceries"}).json()["id"]
     response = client.put(
         f"/api/budgets/{cat_id}",
-        json={"month": "2026-05", "monthly_limit": "200"},
+        json={"monthly_limit": "200"},
     )
     assert response.status_code == 200
     body = response.json()
@@ -11,35 +12,43 @@ def test_put_budget_returns_200_with_new_limit(client):
     assert body["monthly_limit"] == "200.00"
 
 
-def test_put_budget_overwrites_existing(client):
+def test_put_budget_overwrites_existing_in_same_month(client, freeze_month):
+    freeze_month("2026-05")
     cat_id = client.post("/api/categories", json={"name": "Groceries"}).json()["id"]
-    client.put(f"/api/budgets/{cat_id}", json={"month": "2026-05", "monthly_limit": "200"})
+    client.put(f"/api/budgets/{cat_id}", json={"monthly_limit": "200"})
     response = client.put(
         f"/api/budgets/{cat_id}",
-        json={"month": "2026-05", "monthly_limit": "250"},
+        json={"monthly_limit": "250"},
     )
     assert response.status_code == 200
     assert response.json()["monthly_limit"] == "250.00"
 
 
-def test_put_budget_for_unknown_category_returns_404(client):
+def test_put_budget_silently_drops_month_in_payload(client, freeze_month):
+    freeze_month("2026-05")
+    cat_id = client.post("/api/categories", json={"name": "Groceries"}).json()["id"]
     response = client.put(
-        "/api/budgets/9999", json={"month": "2026-05", "monthly_limit": "10"}
+        f"/api/budgets/{cat_id}",
+        json={"month": "2026-05", "monthly_limit": "200"},
     )
+    # BudgetSet has model_config defaulting to extra='ignore' (pydantic v2
+    # default), so the field is silently dropped, not 422'd. The row still
+    # gets effective_month=2026-05 from the clock fixture. Assert that
+    # silent-drop is the behaviour we get.
+    assert response.status_code == 200
+    assert response.json()["month"] == "2026-05"
+
+
+def test_put_budget_for_unknown_category_returns_404(client, freeze_month):
+    freeze_month("2026-05")
+    response = client.put("/api/budgets/9999", json={"monthly_limit": "10"})
     assert response.status_code == 404
 
 
-def test_put_budget_rejects_bad_month(client):
+def test_get_budgets_returns_spending_and_overage(client, freeze_month):
+    freeze_month("2026-05")
     cat_id = client.post("/api/categories", json={"name": "Groceries"}).json()["id"]
-    response = client.put(
-        f"/api/budgets/{cat_id}", json={"month": "2026/05", "monthly_limit": "10"}
-    )
-    assert response.status_code == 422
-
-
-def test_get_budgets_returns_spending_and_overage(client):
-    cat_id = client.post("/api/categories", json={"name": "Groceries"}).json()["id"]
-    client.put(f"/api/budgets/{cat_id}", json={"month": "2026-05", "monthly_limit": "100"})
+    client.put(f"/api/budgets/{cat_id}", json={"monthly_limit": "100"})
     client.post("/api/transactions", json={
         "amount": "60", "date": "2026-05-03", "category_id": cat_id, "description": "food",
     })
@@ -68,13 +77,14 @@ def test_get_budgets_for_month_without_budgets_returns_empty(client):
     assert response.json() == []
 
 
-def test_put_budget_on_income_category_returns_400(client):
+def test_put_budget_on_income_category_returns_400(client, freeze_month):
+    freeze_month("2026-05")
     cat_id = client.post(
         "/api/categories", json={"name": "Salary", "kind": "income"}
     ).json()["id"]
     response = client.put(
         f"/api/budgets/{cat_id}",
-        json={"month": "2026-05", "monthly_limit": "1000"},
+        json={"monthly_limit": "1000"},
     )
     assert response.status_code == 400
     assert "expense" in response.json()["detail"].lower()
