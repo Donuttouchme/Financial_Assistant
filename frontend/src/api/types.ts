@@ -55,7 +55,7 @@ export interface BudgetRead {
 }
 
 export interface BudgetSetPayload {
-  month: string;
+  /** Effective-from month is server-stamped; client only sends the limit. */
   monthly_limit: string;
 }
 
