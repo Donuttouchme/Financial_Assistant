@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user_id
+from app.dependencies import get_current_month, get_current_user_id
 from app.schemas.budget_limit import BudgetRead, BudgetSet, BudgetWithSpending
 from app.services import budget_service
 
@@ -15,13 +15,19 @@ def set_budget(
     payload: BudgetSet,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
+    current_month: str = Depends(get_current_month),
 ):
+    """Set Groceries=X effective from the current calendar month forward.
+
+    The effective month is server-stamped — not client-provided — so a
+    misbehaving client can't silently rewrite past history.
+    """
     try:
         return budget_service.set_budget(
             db,
             user_id=user_id,
             category_id=category_id,
-            month=payload.month,
+            effective_month=current_month,
             monthly_limit=payload.monthly_limit,
         )
     except LookupError as exc:
