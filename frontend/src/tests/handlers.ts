@@ -20,6 +20,7 @@ export const testState = {
   recurringSchedules: [] as RecurringSchedule[],
   settings: { base_currency: "CHF" } as SettingsRead,
   fxStatus: { latest_date: null, source: "frankfurter.dev", is_fresh: false } as FxStatusRead,
+  currentMonth: null as string | null,
   nextCatId: 1,
   nextTxId: 1,
   nextPresetId: 1,
@@ -34,6 +35,7 @@ export function resetTestState() {
   testState.recurringSchedules = [];
   testState.settings = { base_currency: "CHF" };
   testState.fxStatus = { latest_date: null, source: "frankfurter.dev", is_fresh: false };
+  testState.currentMonth = null;
   testState.nextCatId = 1;
   testState.nextTxId = 1;
   testState.nextPresetId = 1;
@@ -224,11 +226,13 @@ export const handlers = [
 
   http.put("/api/budgets/:categoryId", async ({ params, request }) => {
     const categoryId = Number(params.categoryId);
-    const body = (await request.json()) as {
-      month: string; monthly_limit: string;
-    };
+    const body = (await request.json()) as { monthly_limit: string };
+    // Server-stamps the effective month. Tests can override the stamped
+    // value by setting `testState.currentMonth` before driving the UI.
+    const effectiveMonth = testState.currentMonth ?? "2026-06";
+
     const existing = testState.budgets.find(
-      (b) => b.category_id === categoryId && b.month === body.month,
+      (b) => b.category_id === categoryId && b.month === effectiveMonth,
     );
     if (existing) {
       existing.monthly_limit = body.monthly_limit;
@@ -237,7 +241,7 @@ export const handlers = [
     const created: BudgetRead = {
       id: testState.budgets.length + 1,
       category_id: categoryId,
-      month: body.month,
+      month: effectiveMonth,
       monthly_limit: body.monthly_limit,
     };
     testState.budgets.push(created);
@@ -249,7 +253,16 @@ export const handlers = [
     const month = url.searchParams.get("month");
 
     const budgets = month
-      ? testState.budgets.filter((b) => b.month === month)
+      ? (() => {
+          // Per-category latest row at-or-before `month`.
+          const byCat = new Map<number, BudgetRead>();
+          for (const b of testState.budgets) {
+            if (b.month > month) continue;
+            const prev = byCat.get(b.category_id);
+            if (!prev || prev.month < b.month) byCat.set(b.category_id, b);
+          }
+          return Array.from(byCat.values());
+        })()
       : testState.budgets;
 
     const result: BudgetWithSpending[] = budgets.map((b) => {
