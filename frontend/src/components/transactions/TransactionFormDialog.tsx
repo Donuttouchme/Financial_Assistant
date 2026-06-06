@@ -208,9 +208,9 @@ export function TransactionFormDialog(props: Props) {
           {savedFlash && (
             <div
               role="status"
-              className="flex items-center gap-2 rounded-md bg-emerald-100 dark:bg-emerald-900 px-3 py-2 text-sm"
+              className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 text-foreground px-3 py-2 text-sm"
             >
-              <CheckCircle2 className="h-4 w-4" />
+              <CheckCircle2 className="h-4 w-4 text-primary" />
               <span>Saved — enter the next one</span>
             </div>
           )}
