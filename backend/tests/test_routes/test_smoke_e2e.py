@@ -1,4 +1,5 @@
-def test_full_user_flow(client):
+def test_full_user_flow(client, freeze_month):
+    freeze_month("2026-05")
     # 1. Health
     assert client.get("/api/health").json() == {"status": "ok"}
 
@@ -20,9 +21,9 @@ def test_full_user_flow(client):
     listed = client.get("/api/transactions", params={"month": "2026-05"}).json()
     assert len(listed) == 2
 
-    # 4. Set a budget that gets blown
+    # 4. Set a budget that gets blown (effective_month server-stamped to 2026-05)
     client.put(f"/api/budgets/{groceries['id']}",
-               json={"month": "2026-05", "monthly_limit": "10"})
+               json={"monthly_limit": "10"})
     budgets = client.get("/api/budgets", params={"month": "2026-05"}).json()
     assert budgets[0]["over_budget"] is True
 
